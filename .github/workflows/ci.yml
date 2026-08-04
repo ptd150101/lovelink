@@ -96,7 +96,9 @@ jobs:
       - working-directory: frontend
         run: npx playwright install --with-deps chromium
       - name: Prepare environment
-        run: cp .env.example .env
+        run: |
+          cp .env.example .env
+          echo 'PHONE_OTP_FIXED_CODE=123456' >> .env
       - name: Start real application stack
         run: |
           docker compose up -d --build postgres redis minio minio-init backend frontend
