@@ -97,6 +97,12 @@ class PhoneVerificationChallenge(models.Model):
     class Meta:
         ordering = ("-sent_at",)
         indexes = [
-            models.Index(fields=["user", "-sent_at"]),
-            models.Index(fields=["phone", "-sent_at"]),
+            models.Index(
+                fields=["user", "-sent_at"],
+                name="accounts_ph_user_id_99621f_idx",
+            ),
+            models.Index(
+                fields=["phone", "-sent_at"],
+                name="accounts_ph_phone_7f64da_idx",
+            ),
         ]
