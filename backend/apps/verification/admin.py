@@ -10,6 +10,12 @@ from .models import VerificationEvidence, VerificationRequest, VerificationRevie
 from .services import VerificationActionError, review_verification_request
 
 
+def can_review(request):
+    return request.user.is_superuser or request.user.has_perm(
+        "verification.review_verificationrequest"
+    )
+
+
 class EvidenceInline(admin.TabularInline):
     model = VerificationEvidence
     extra = 0
@@ -41,10 +47,16 @@ class EvidenceInline(admin.TabularInline):
             url,
         )
 
+    def has_view_permission(self, request, obj=None):
+        return can_review(request)
+
     def has_add_permission(self, request, obj=None):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
 
 
@@ -63,10 +75,16 @@ class ReviewInline(admin.TabularInline):
     )
     readonly_fields = fields
 
+    def has_view_permission(self, request, obj=None):
+        return can_review(request)
+
     def has_add_permission(self, request, obj=None):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
 
 
@@ -122,15 +140,13 @@ class VerificationRequestAdmin(admin.ModelAdmin):
     )
 
     def has_module_permission(self, request):
-        return request.user.is_superuser or request.user.has_perm(
-            "verification.review_verificationrequest"
-        )
+        return can_review(request)
 
     def has_view_permission(self, request, obj=None):
-        return self.has_module_permission(request)
+        return can_review(request)
 
     def has_change_permission(self, request, obj=None):
-        return self.has_module_permission(request)
+        return can_review(request)
 
     def has_add_permission(self, request):
         return False
@@ -145,6 +161,7 @@ class VerificationRequestAdmin(admin.ModelAdmin):
     @admin.display(description="Bằng chứng xác minh")
     def evidence_summary(self, obj):
         links = []
+        errors = []
         for evidence in obj.evidence.filter(deleted_at__isnull=True):
             try:
                 url = presign_get(
@@ -154,14 +171,19 @@ class VerificationRequestAdmin(admin.ModelAdmin):
                 )
                 links.append((url, evidence.get_evidence_type_display()))
             except Exception:
-                links.append(("", f"{evidence.get_evidence_type_display()} — lỗi storage"))
-        if not links:
-            return "Chưa có bằng chứng"
-        return format_html_join(
+                errors.append(evidence.get_evidence_type_display())
+        rendered = format_html_join(
             "<br>",
             '<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>',
             links,
-        )
+        ) if links else ""
+        if errors:
+            error_text = format_html(
+                "<br><span style='color:#b91c1c'>Không tạo được link: {}</span>",
+                ", ".join(errors),
+            )
+            return format_html("{}{}", rendered, error_text)
+        return rendered or "Chưa có bằng chứng"
 
     def _run_action(self, request, queryset, action):
         success = 0
