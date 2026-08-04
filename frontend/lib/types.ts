@@ -51,6 +51,7 @@ export type Profile = {
   visibility_status?: string;
   completion_percent: number;
   verification_level: string;
+  is_phone_verified: boolean;
   verified_at?: string | null;
   connection_status?: string;
   presence?: Presence | null;
@@ -60,6 +61,7 @@ export type CompactUser = {
   public_id: string;
   display_name: string;
   verification_level: string;
+  is_phone_verified: boolean;
   primary_photo?: Photo | null;
   presence?: Presence | null;
 };
@@ -86,12 +88,21 @@ export type Message = {
   created_at: string;
 };
 
+export type MessageReadReceipt = {
+  conversation_id: string;
+  reader_public_id: string;
+  message_id: string;
+  read_at: string;
+};
+
 export type Conversation = {
   id: string;
   other_user: CompactUser;
   last_message?: Message | null;
   last_message_at?: string | null;
   unread_count: number;
+  other_last_read_message_id?: string | null;
+  other_last_read_at?: string | null;
   created_at: string;
 };
 
