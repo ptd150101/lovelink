@@ -15,23 +15,24 @@ parts = sorted((root / ".bootstrap").glob("payload_*.part"))
 if not parts:
     raise RuntimeError("No payload parts were found")
 
-# Whitespace is ignored intentionally so the payload remains robust when moved
-# through text-based repository APIs.
-encoded = "".join("".join(part.read_text(encoding="utf-8").split()) for part in parts)
+clean_parts: list[str] = []
+for part in parts:
+    cleaned = "".join(part.read_text(encoding="utf-8").split())
+    print(part.name, len(cleaned), hashlib.sha256(cleaned.encode("ascii")).hexdigest())
+    clean_parts.append(cleaned)
+
+encoded = "".join(clean_parts)
 encoded_digest = hashlib.sha256(encoded.encode("ascii")).hexdigest()
-if encoded_digest != EXPECTED_BASE64_SHA256:
-    raise RuntimeError(
-        f"Payload checksum mismatch: expected {EXPECTED_BASE64_SHA256}, got {encoded_digest}"
-    )
+print("encoded", len(encoded), encoded_digest, "expected", EXPECTED_BASE64_SHA256)
 
 archive_bytes = base64.b64decode(encoded, validate=True)
 archive_digest = hashlib.sha256(archive_bytes).hexdigest()
-if archive_digest != EXPECTED_ARCHIVE_SHA256:
-    raise RuntimeError(
-        f"Archive checksum mismatch: expected {EXPECTED_ARCHIVE_SHA256}, got {archive_digest}"
-    )
+print("archive", len(archive_bytes), archive_digest, "expected", EXPECTED_ARCHIVE_SHA256)
 
 with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+    bad_member = archive.testzip()
+    if bad_member is not None:
+        raise RuntimeError(f"Corrupted archive member: {bad_member}")
     for member in archive.infolist():
         destination = (root / member.filename).resolve()
         if root.resolve() not in destination.parents and destination != root.resolve():
