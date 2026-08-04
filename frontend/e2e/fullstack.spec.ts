@@ -11,9 +11,13 @@ async function login(page: Page, email: string, password: string) {
   await expect(page).toHaveURL(/\/discover/);
 }
 
-test("real backend supports realtime chat, receipts and incoming-call recovery", async ({ browser }) => {
-  const firstContext = await browser.newContext();
-  const secondContext = await browser.newContext();
+test("real backend supports realtime chat, receipts and a LiveKit call", async ({ browser }) => {
+  const firstContext = await browser.newContext({
+    permissions: ["camera", "microphone"],
+  });
+  const secondContext = await browser.newContext({
+    permissions: ["camera", "microphone"],
+  });
   const first = await firstContext.newPage();
   const second = await secondContext.newPage();
 
@@ -34,10 +38,20 @@ test("real backend supports realtime chat, receipts and incoming-call recovery",
   await first.getByTitle("Gọi video").click();
   await expect(first).toHaveURL(/\/calls\//);
 
+  // Reloading the callee proves the pending call is recovered through REST.
   await second.reload();
-  await expect(second.getByText("đang gọi video cho bạn")).toBeVisible({ timeout: 15_000 });
-  await second.getByRole("button", { name: /Từ chối/ }).click();
-  await expect(first).toHaveURL(/\/messages/, { timeout: 15_000 });
+  await expect(second.getByText("đang gọi video cho bạn")).toBeVisible({
+    timeout: 15_000,
+  });
+  await second.getByRole("button", { name: /Trả lời/ }).click();
+  await expect(second).toHaveURL(/\/calls\//);
+  await expect(first.locator(".video-stage")).toBeVisible({ timeout: 20_000 });
+  await expect(second.locator(".video-stage")).toBeVisible({ timeout: 20_000 });
+  await expect(first.getByText(/Kết nối|Đang đo chất lượng/)).toBeVisible();
+
+  await first.getByRole("button", { name: /Kết thúc/ }).click();
+  await expect(first).toHaveURL(/\/messages/);
+  await expect(second).toHaveURL(/\/messages/, { timeout: 15_000 });
 
   await firstContext.close();
   await secondContext.close();
