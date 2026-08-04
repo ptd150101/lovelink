@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from django.db import transaction
 from django.utils import timezone
 
@@ -10,13 +8,14 @@ from apps.notifications.models import Notification
 from apps.notifications.services import push_notification
 from apps.profiles.models import Profile
 
-from .models import VerificationRequest, VerificationReview
+from .models import VerificationEvidence, VerificationRequest, VerificationReview
 
 
-@dataclass(frozen=True)
 class VerificationActionError(Exception):
-    message: str
-    conflict: bool = False
+    def __init__(self, message: str, conflict: bool = False):
+        super().__init__(message)
+        self.message = message
+        self.conflict = conflict
 
     def __str__(self) -> str:
         return self.message
@@ -67,6 +66,7 @@ def review_verification_request(
         locked = (
             VerificationRequest.objects.select_for_update()
             .select_related("user__profile")
+            .prefetch_related("evidence")
             .get(pk=verification_request.pk)
         )
         previous_status = locked.status
@@ -75,6 +75,18 @@ def review_verification_request(
                 "Trạng thái hiện tại không cho phép thực hiện hành động này.",
                 conflict=True,
             )
+
+        if action == "approve":
+            available = set(
+                locked.evidence.filter(deleted_at__isnull=True).values_list(
+                    "evidence_type", flat=True
+                )
+            )
+            missing = set(VerificationEvidence.Type.values) - available
+            if missing:
+                raise VerificationActionError(
+                    "Không thể phê duyệt khi chưa có đủ giấy tờ, selfie và selfie với mã thử thách."
+                )
 
         new_status = ACTION_STATUS[action]
         locked.status = new_status

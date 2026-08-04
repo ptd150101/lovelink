@@ -6,8 +6,15 @@ from django.utils import timezone
 from apps.audit.models import AuditLog
 from apps.notifications.models import Notification
 from apps.profiles.models import Profile
-from apps.verification.models import VerificationRequest, VerificationReview
-from apps.verification.services import VerificationActionError, review_verification_request
+from apps.verification.models import (
+    VerificationEvidence,
+    VerificationRequest,
+    VerificationReview,
+)
+from apps.verification.services import (
+    VerificationActionError,
+    review_verification_request,
+)
 
 
 @pytest.mark.django_db
@@ -25,6 +32,14 @@ def test_reviewer_approval_sets_badge_and_audit(user_factory):
         challenge_code="ABC123",
         submitted_at=timezone.now(),
     )
+    for evidence_type in VerificationEvidence.Type.values:
+        VerificationEvidence.objects.create(
+            request=verification,
+            evidence_type=evidence_type,
+            private_object_key=f"verification/service-tests/{evidence_type}.webp",
+            mime_type="image/webp",
+            file_size=100,
+        )
 
     result = review_verification_request(
         verification_request=verification,
@@ -36,8 +51,12 @@ def test_reviewer_approval_sets_badge_and_audit(user_factory):
     assert result.status == VerificationRequest.Status.VERIFIED
     assert member.profile.verification_level == Profile.VerificationLevel.IDENTITY
     assert member.profile.verified_at is not None
-    assert VerificationReview.objects.filter(request=verification, action="approve").exists()
-    assert AuditLog.objects.filter(target_id=str(verification.pk), action="verification.approve").exists()
+    assert VerificationReview.objects.filter(
+        request=verification, action="approve"
+    ).exists()
+    assert AuditLog.objects.filter(
+        target_id=str(verification.pk), action="verification.approve"
+    ).exists()
     assert Notification.objects.filter(
         user=member, type=Notification.Type.VERIFICATION_APPROVED
     ).exists()

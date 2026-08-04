@@ -1,11 +1,293 @@
 "use client";
-import {useEffect,useState} from "react";import {useRouter} from "next/navigation";import {api,uploadToSignedUrl} from "@/lib/api";import type {Profile} from "@/lib/types";import {Button,Card,Field,Input,Select,Textarea} from "./ui";
-type Ref={provinces:{code:string;name:string}[];occupations:{id:string;name:string}[];interests:{id:string;name:string}[];choices:Record<string,[string,string][]>};
-const steps=["basic","details","photos","privacy","review"] as const;type Step=typeof steps[number];
-export function ProfileEditor({step="basic",edit=false}:{step?:Step;edit?:boolean}){const [profile,setProfile]=useState<any>(null);const [ref,setRef]=useState<Ref|null>(null);const [error,setError]=useState("");const [busy,setBusy]=useState(false);const router=useRouter();useEffect(()=>{Promise.all([api<Profile>("/me/profile"),api<Ref>("/reference-data")]).then(([p,r])=>{setProfile({...p,current_province:p.current_province?.code||"",hometown_province:p.hometown_province?.code||"",occupation_category:p.occupation_category?.id||"",interest_ids:p.interests.map(x=>x.id)});setRef(r)}).catch(e=>setError(e.message))},[]);if(!profile||!ref)return <div className="page"><p>{error||"Đang tải hồ sơ…"}</p></div>;const set=(k:string,v:any)=>setProfile((x:any)=>({...x,[k]:v}));async function save(next?:string){setBusy(true);setError("");try{const payload={...profile};delete payload.public_id;delete payload.age;delete payload.photos;delete payload.interests;delete payload.visibility_status;delete payload.completion_percent;delete payload.verification_level;delete payload.verified_at;delete payload.published_at;await api("/me/profile",{method:"PATCH",body:JSON.stringify(payload)});router.push(next||"/me/profile")}catch(e:any){setError(e.message)}finally{setBusy(false)}}async function publish(){await save();try{await api("/me/profile/publish",{method:"POST"});router.push("/discover")}catch(e:any){setError(e.message)}}async function upload(file:File){try{const p=await api<any>("/me/photos/presign",{method:"POST",body:JSON.stringify({content_type:file.type,size:file.size})});await uploadToSignedUrl(p.upload_url,file,p.headers);const photo=await api<any>("/me/photos/complete",{method:"POST",body:JSON.stringify({object_key:p.object_key})});setProfile((x:any)=>({...x,photos:[...x.photos,photo]}))}catch(e:any){setError(e.message)}}async function remove(id:string){await api(`/me/photos/${id}`,{method:"DELETE"});setProfile((x:any)=>({...x,photos:x.photos.filter((p:any)=>p.id!==id)}))}
- const idx=steps.indexOf(step);const next=idx<steps.length-1?`/onboarding/${steps[idx+1]}`:"/discover";return <div className="page narrow"><div className="page-heading"><div><span className="eyebrow">{edit?"Chỉnh sửa hồ sơ":`Bước ${idx+1}/5`}</span><h1>{({basic:"Thông tin cơ bản",details:"Thông tin cá nhân",photos:"Ảnh và giới thiệu",privacy:"Quyền riêng tư",review:"Kiểm tra hồ sơ"} as any)[step]}</h1></div><span>{profile.completion_percent||0}% hoàn thiện</span></div><div className="stepper">{steps.map((s,i)=><div key={s} className={i<=idx?"done":""}>{i+1}</div>)}</div>{step==="basic"&&<Card className="form-grid"><Field label="Tên hiển thị"><Input value={profile.display_name||""} onChange={e=>set("display_name",e.target.value)}/></Field><Field label="Ngày sinh"><Input type="date" value={profile.birth_date||""} onChange={e=>set("birth_date",e.target.value)}/></Field><Field label="Giới tính"><Select value={profile.gender||""} onChange={e=>set("gender",e.target.value)}><option value="">Chọn</option>{ref.choices.genders.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field><Field label="Muốn tìm"><div className="checkbox-grid">{ref.choices.genders.map(x=><label className="check" key={x[0]}><input type="checkbox" checked={(profile.interested_genders||[]).includes(x[0])} onChange={e=>set("interested_genders",e.target.checked?[...(profile.interested_genders||[]),x[0]]:(profile.interested_genders||[]).filter((v:string)=>v!==x[0]))}/>{x[1]}</label>)}</div></Field><Field label="Tỉnh/thành hiện tại"><Select value={profile.current_province||""} onChange={e=>set("current_province",e.target.value)}><option value="">Chọn</option>{ref.provinces.map(x=><option key={x.code} value={x.code}>{x.name}</option>)}</Select></Field><Field label="Tình trạng"><Select value={profile.relationship_status||""} onChange={e=>set("relationship_status",e.target.value)}><option value="">Chọn</option>{ref.choices.relationship_status.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field><Field label="Mục tiêu"><Select value={profile.relationship_goal||""} onChange={e=>set("relationship_goal",e.target.value)}><option value="">Chọn</option>{ref.choices.goals.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field></Card>}
- {step==="details"&&<Card className="form-grid"><Field label="Chiều cao (cm)"><Input type="number" min={120} max={230} value={profile.height_cm||""} onChange={e=>set("height_cm",Number(e.target.value))}/></Field><Field label="Quê quán"><Select value={profile.hometown_province||""} onChange={e=>set("hometown_province",e.target.value)}><option value="">Chọn</option>{ref.provinces.map(x=><option key={x.code} value={x.code}>{x.name}</option>)}</Select></Field><Field label="Nhóm nghề nghiệp"><Select value={profile.occupation_category||""} onChange={e=>set("occupation_category",e.target.value)}><option value="">Chọn</option>{ref.occupations.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field><Field label="Nghề nghiệp cụ thể"><Input value={profile.occupation_text||""} onChange={e=>set("occupation_text",e.target.value)}/></Field><Field label="Học vấn"><Select value={profile.education_level||""} onChange={e=>set("education_level",e.target.value)}><option value="">Chọn</option>{ref.choices.education.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field><Field label="Thu nhập"><Select value={profile.income_band||""} onChange={e=>set("income_band",e.target.value)}><option value="">Không khai báo</option>{ref.choices.income.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field><Field label="Tôn giáo"><Input value={profile.religion||""} onChange={e=>set("religion",e.target.value)}/></Field><Field label="Hút thuốc"><Select value={profile.smoking_status||""} onChange={e=>set("smoking_status",e.target.value)}><option value="">Không khai báo</option>{ref.choices.habits.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field><Field label="Uống rượu"><Select value={profile.drinking_status||""} onChange={e=>set("drinking_status",e.target.value)}><option value="">Không khai báo</option>{ref.choices.habits.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field><Field label="Con cái"><Select value={profile.children_status||""} onChange={e=>set("children_status",e.target.value)}><option value="">Không khai báo</option>{ref.choices.children.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field><Field label="Kế hoạch sinh con"><Select value={profile.children_plan||""} onChange={e=>set("children_plan",e.target.value)}><option value="">Không khai báo</option>{ref.choices.children_plan.map(x=><option key={x[0]} value={x[0]}>{x[1]}</option>)}</Select></Field></Card>}
- {step==="photos"&&<><Card><h2>Ảnh hồ sơ</h2><p className="muted">Tối đa 6 ảnh JPG, PNG hoặc WebP; mỗi ảnh không quá 10 MB.</p><div className="photo-manager">{profile.photos.map((p:any)=><div key={p.id}><img src={p.public_url} alt="Ảnh hồ sơ"/><button onClick={()=>remove(p.id)}>Xóa</button></div>)}{profile.photos.length<6&&<label className="upload-box"><input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={e=>e.target.files?.[0]&&upload(e.target.files[0])}/><span>+ Tải ảnh</span></label>}</div></Card><Card className="form-stack"><Field label="Giới thiệu bản thân" hint="Tối thiểu 50, tối đa 1.500 ký tự."><Textarea rows={7} value={profile.bio||""} onChange={e=>set("bio",e.target.value)}/></Field><Field label="Mong muốn ở đối phương"><Textarea rows={5} value={profile.looking_for||""} onChange={e=>set("looking_for",e.target.value)}/></Field><Field label="Sở thích (tối đa 10)"><div className="checkbox-grid">{ref.interests.map(x=><label className="check" key={x.id}><input type="checkbox" checked={(profile.interest_ids||[]).includes(x.id)} onChange={e=>{const old=profile.interest_ids||[];if(e.target.checked&&old.length<10)set("interest_ids",[...old,x.id]);else if(!e.target.checked)set("interest_ids",old.filter((v:string)=>v!==x.id))}}/>{x.name}</label>)}</div></Field></Card></>}
- {step==="privacy"&&<Card><h2>Ai có thể xem?</h2><p className="muted">Email, số điện thoại và ngày sinh đầy đủ luôn được giữ riêng tư.</p>{["income_band","hometown_province","current_province","education_level","religion","smoking_status","drinking_status","children_status","children_plan"].map(f=><Field key={f} label={({income_band:"Thu nhập",hometown_province:"Quê quán",current_province:"Nơi ở",education_level:"Học vấn",religion:"Tôn giáo",smoking_status:"Hút thuốc",drinking_status:"Uống rượu",children_status:"Con cái",children_plan:"Kế hoạch sinh con"} as any)[f]}><Select value={(profile.field_visibility||{})[f]||"members"} onChange={e=>set("field_visibility",{...(profile.field_visibility||{}),[f]:e.target.value})}><option value="members">Thành viên đã đăng nhập</option><option value="connections">Chỉ người đã kết nối</option><option value="private">Chỉ mình tôi</option></Select></Field>)}</Card>}
- {step==="review"&&<Card><h2>{profile.display_name||"Hồ sơ của bạn"}, {profile.age}</h2><p>{profile.bio||"Chưa có giới thiệu."}</p><dl className="detail-list"><div><dt>Chiều cao</dt><dd>{profile.height_cm||"—"} cm</dd></div><div><dt>Nghề nghiệp</dt><dd>{profile.occupation_text||"—"}</dd></div><div><dt>Ảnh</dt><dd>{profile.photos.length}/6</dd></div><div><dt>Hoàn thiện</dt><dd>{profile.completion_percent}%</dd></div></dl><p className="muted">Sau khi công khai, hồ sơ sẽ xuất hiện trong Khám phá. Bạn có thể ẩn hồ sơ bất kỳ lúc nào.</p></Card>}
- {error&&<div className="alert error-box">{error}</div>}<div className="form-actions">{idx>0&&!edit&&<Button variant="secondary" onClick={()=>router.push(`/onboarding/${steps[idx-1]}`)}>Quay lại</Button>}<Button disabled={busy} onClick={()=>step==="review"?publish():save(edit?undefined:next)}>{busy?"Đang lưu…":step==="review"?"Công khai hồ sơ":edit?"Lưu thay đổi":"Lưu và tiếp tục"}</Button></div></div>}
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { api, uploadToSignedUrl } from "@/lib/api";
+import type { Photo, Profile } from "@/lib/types";
+import { Button, Card } from "./ui";
+import { PhotoManager } from "./photo-manager";
+import {
+  BasicProfileFields,
+  DetailProfileFields,
+  PrivacyProfileFields,
+  ProfileReview,
+  ProfileTextAndInterests,
+  type ReferenceData,
+} from "./profile-step-fields";
+
+const steps = ["basic", "details", "photos", "privacy", "review"] as const;
+type Step = (typeof steps)[number];
+
+const titles: Record<Step, string> = {
+  basic: "Thông tin cơ bản",
+  details: "Thông tin cá nhân",
+  photos: "Ảnh và giới thiệu",
+  privacy: "Quyền riêng tư",
+  review: "Kiểm tra hồ sơ",
+};
+
+export function ProfileEditor({
+  step = "basic",
+  edit = false,
+}: {
+  step?: Step;
+  edit?: boolean;
+}) {
+  const [profile, setProfile] = useState<any>(null);
+  const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    Promise.all([
+      api<Profile>("/me/profile"),
+      api<ReferenceData>("/reference-data"),
+    ])
+      .then(([loaded, reference]) => {
+        setProfile({
+          ...loaded,
+          current_province: loaded.current_province?.code || "",
+          hometown_province: loaded.hometown_province?.code || "",
+          occupation_category: loaded.occupation_category?.id || "",
+          interest_ids: loaded.interests
+            .map((interest) => interest.id)
+            .filter(Boolean),
+        });
+        setReferenceData(reference);
+      })
+      .catch((caught) => setError(caught.message));
+  }, []);
+
+  if (!profile || !referenceData) {
+    return (
+      <div className="page">
+        <p>{error || "Đang tải hồ sơ…"}</p>
+      </div>
+    );
+  }
+
+  const setField = (key: string, value: any) =>
+    setProfile((current: any) => ({ ...current, [key]: value }));
+
+  function writablePayload() {
+    const payload = { ...profile };
+    for (const key of [
+      "public_id",
+      "age",
+      "photos",
+      "interests",
+      "visibility_status",
+      "completion_percent",
+      "verification_level",
+      "verified_at",
+      "published_at",
+      "presence",
+    ]) {
+      delete payload[key];
+    }
+    return payload;
+  }
+
+  async function persist() {
+    return api<Profile>("/me/profile", {
+      method: "PATCH",
+      body: JSON.stringify(writablePayload()),
+    });
+  }
+
+  async function save(next?: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await persist();
+      router.push(next || "/me/profile");
+    } catch (caught: any) {
+      setError(caught.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function publish() {
+    setBusy(true);
+    setError("");
+    try {
+      await persist();
+      await api("/me/profile/publish", { method: "POST" });
+      router.push("/discover");
+    } catch (caught: any) {
+      setError(caught.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function upload(file: File) {
+    setError("");
+    try {
+      const signed = await api<any>("/me/photos/presign", {
+        method: "POST",
+        body: JSON.stringify({ content_type: file.type, size: file.size }),
+      });
+      await uploadToSignedUrl(signed.upload_url, file, signed.headers);
+      const photo = await api<Photo>("/me/photos/complete", {
+        method: "POST",
+        body: JSON.stringify({ object_key: signed.object_key }),
+      });
+      setProfile((current: any) => ({
+        ...current,
+        photos: [...current.photos, photo],
+      }));
+    } catch (caught: any) {
+      setError(caught.message);
+    }
+  }
+
+  async function remove(photo: Photo) {
+    setError("");
+    if (photo.is_primary && profile.photos.length > 1) {
+      setError("Hãy chọn ảnh đại diện khác trước khi xóa ảnh này.");
+      return;
+    }
+    try {
+      await api(`/me/photos/${photo.id}`, { method: "DELETE" });
+      setProfile((current: any) => ({
+        ...current,
+        photos: current.photos.filter((item: Photo) => item.id !== photo.id),
+      }));
+    } catch (caught: any) {
+      setError(caught.message);
+    }
+  }
+
+  async function primary(photoId: string) {
+    setError("");
+    try {
+      await api(`/me/photos/${photoId}/primary`, { method: "POST" });
+      setProfile((current: any) => ({
+        ...current,
+        photos: current.photos.map((photo: Photo) => ({
+          ...photo,
+          is_primary: photo.id === photoId,
+        })),
+      }));
+    } catch (caught: any) {
+      setError(caught.message);
+    }
+  }
+
+  async function reorder(nextPhotos: Photo[]) {
+    const previous = profile.photos as Photo[];
+    const normalized = nextPhotos.map((photo, index) => ({
+      ...photo,
+      position: index,
+    }));
+    setProfile((current: any) => ({ ...current, photos: normalized }));
+    try {
+      const saved = await api<Photo[]>("/me/photos/reorder", {
+        method: "PATCH",
+        body: JSON.stringify({ photo_ids: normalized.map((photo) => photo.id) }),
+      });
+      setProfile((current: any) => ({ ...current, photos: saved }));
+    } catch (caught: any) {
+      setProfile((current: any) => ({ ...current, photos: previous }));
+      setError(caught.message);
+    }
+  }
+
+  const index = steps.indexOf(step);
+  const next =
+    index < steps.length - 1
+      ? `/onboarding/${steps[index + 1]}`
+      : "/discover";
+  const shared = { profile, referenceData, setField };
+  const photoSection = (
+    <>
+      <Card>
+        <h2>Ảnh hồ sơ</h2>
+        <p className="muted">
+          Kéo thả để sắp xếp, dùng mũi tên trên màn hình cảm ứng và chọn rõ ảnh
+          đại diện. Tối đa 6 ảnh JPG, PNG hoặc WebP.
+        </p>
+        <PhotoManager
+          photos={profile.photos}
+          onUpload={upload}
+          onRemove={remove}
+          onPrimary={primary}
+          onReorder={reorder}
+        />
+      </Card>
+      <ProfileTextAndInterests {...shared} />
+    </>
+  );
+
+  return (
+    <div className="page narrow">
+      <div className="page-heading">
+        <div>
+          <span className="eyebrow">
+            {edit ? "Chỉnh sửa hồ sơ" : `Bước ${index + 1}/5`}
+          </span>
+          <h1>{edit ? "Toàn bộ hồ sơ" : titles[step]}</h1>
+        </div>
+        <span>{profile.completion_percent || 0}% hoàn thiện</span>
+      </div>
+
+      {!edit && (
+        <div className="stepper">
+          {steps.map((item, itemIndex) => (
+            <div key={item} className={itemIndex <= index ? "done" : ""}>
+              {itemIndex + 1}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {edit ? (
+        <div className="form-stack">
+          <BasicProfileFields {...shared} />
+          <DetailProfileFields {...shared} />
+          {photoSection}
+          <PrivacyProfileFields {...shared} />
+        </div>
+      ) : (
+        <>
+          {step === "basic" && <BasicProfileFields {...shared} />}
+          {step === "details" && <DetailProfileFields {...shared} />}
+          {step === "photos" && photoSection}
+          {step === "privacy" && <PrivacyProfileFields {...shared} />}
+          {step === "review" && <ProfileReview profile={profile} />}
+        </>
+      )}
+
+      {error && <div className="alert error-box">{error}</div>}
+      <div className="form-actions">
+        {index > 0 && !edit && (
+          <Button
+            variant="secondary"
+            onClick={() => router.push(`/onboarding/${steps[index - 1]}`)}
+          >
+            Quay lại
+          </Button>
+        )}
+        <Button
+          disabled={busy}
+          onClick={() =>
+            step === "review" && !edit
+              ? void publish()
+              : void save(edit ? undefined : next)
+          }
+        >
+          {busy
+            ? "Đang lưu…"
+            : step === "review" && !edit
+              ? "Công khai hồ sơ"
+              : edit
+                ? "Lưu toàn bộ thay đổi"
+                : "Lưu và tiếp tục"}
+        </Button>
+      </div>
+    </div>
+  );
+}
