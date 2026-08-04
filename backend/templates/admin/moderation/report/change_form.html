@@ -1,0 +1,31 @@
+{% extends "admin/change_form.html" %}
+
+{% block after_field_sets %}
+  {{ block.super }}
+  {% if original and can_review %}
+    <fieldset class="module aligned">
+      <h2>Xử lý báo cáo</h2>
+      <div class="form-row">
+        <label for="id_moderation_action"><strong>Hành động</strong></label>
+        <select id="id_moderation_action" name="moderation_action" required>
+          <option value="">---------</option>
+          {% for value, label in moderation_actions %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="id_reason"><strong>Lý do</strong></label>
+        <textarea id="id_reason" name="reason" rows="4" required placeholder="Ghi rõ căn cứ xử lý"></textarea>
+      </div>
+      <div class="form-row">
+        <label for="id_expires_at"><strong>Thời hạn đình chỉ</strong></label>
+        <input id="id_expires_at" name="expires_at" type="datetime-local">
+        <p class="help">Chỉ cần điền khi áp dụng đình chỉ có thời hạn.</p>
+      </div>
+      <div class="submit-row">
+        <button type="submit" class="button default" formaction="{{ moderation_action_url }}" formmethod="post">Thực hiện xử lý</button>
+      </div>
+    </fieldset>
+  {% endif %}
+{% endblock %}
