@@ -25,7 +25,7 @@ def _coalesced_message_notification(*, user, title, body, actor, entity):
         return None
     now = timezone.now()
     window_start = now - timedelta(
-        seconds=settings.MESSAGE_NOTIFICATION_COALESCE_SECONDS
+        seconds=getattr(settings, "MESSAGE_NOTIFICATION_COALESCE_SECONDS", 300)
     )
     entity_type = entity.__class__.__name__
     entity_id = str(entity.pk)
