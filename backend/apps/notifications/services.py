@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 
 from asgiref.sync import async_to_sync
@@ -20,13 +21,20 @@ REQUIRED_IN_APP_TYPES = {
 }
 
 
+def _coalesce_seconds() -> int:
+    return int(
+        os.getenv(
+            "MESSAGE_NOTIFICATION_COALESCE_SECONDS",
+            getattr(settings, "MESSAGE_NOTIFICATION_COALESCE_SECONDS", 300),
+        )
+    )
+
+
 def _coalesced_message_notification(*, user, title, body, actor, entity):
     if not entity:
         return None
     now = timezone.now()
-    window_start = now - timedelta(
-        seconds=getattr(settings, "MESSAGE_NOTIFICATION_COALESCE_SECONDS", 300)
-    )
+    window_start = now - timedelta(seconds=_coalesce_seconds())
     entity_type = entity.__class__.__name__
     entity_id = str(entity.pk)
     notification = (
