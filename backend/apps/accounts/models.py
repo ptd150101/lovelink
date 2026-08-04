@@ -106,3 +106,21 @@ class PhoneVerificationChallenge(models.Model):
                 name="accounts_ph_phone_7f64da_idx",
             ),
         ]
+
+
+class StaffTotpDevice(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="staff_totp_device",
+    )
+    encrypted_secret = models.TextField()
+    is_active = models.BooleanField(default=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    last_used_step = models.BigIntegerField(default=-1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"TOTP for {self.user.email}"
