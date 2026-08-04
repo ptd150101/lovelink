@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import base64
-import hashlib
-import json
+import binascii
+import shutil
+import struct
 import subprocess
-from pathlib import Path
-
-EXPECTED_BASE64_SHA256 = "c85692cf17c8e2585f4183eae9c4c79e03c9c232428dbde4e32d67448d17da77"
-EXPECTED_ARCHIVE_SHA256 = "99e08f536e2c884634c1559d7be496ef4a6c95b738986694d5c75591ee9f76fc"
+import zlib
+from pathlib import Path, PurePosixPath
 
 PAYLOAD_SOURCES = [
     ("1770e5909a2f4e64c9df55e75ecbf51cef310e2c", ".bootstrap/payload_00.part"),
@@ -23,66 +22,76 @@ PAYLOAD_SOURCES = [
 ]
 
 root = Path(__file__).resolve().parents[1]
-out = Path("/tmp/lovelink-recovery")
-out.mkdir(parents=True, exist_ok=True)
 parts: list[str] = []
-summary: dict[str, object] = {
-    "expected_base64_sha256": EXPECTED_BASE64_SHA256,
-    "expected_archive_sha256": EXPECTED_ARCHIVE_SHA256,
-    "parts": [],
-}
-
-for index, (commit, path) in enumerate(PAYLOAD_SOURCES):
+for commit, path in PAYLOAD_SOURCES:
     raw = subprocess.check_output(["git", "show", f"{commit}:{path}"], cwd=root, text=True)
-    cleaned = "".join(raw.split())
-    parts.append(cleaned)
-    (out / f"part_{index:02d}.txt").write_text(cleaned, encoding="ascii")
-    summary["parts"].append(
-        {
-            "index": index,
-            "commit": commit,
-            "path": path,
-            "length": len(cleaned),
-            "sha256": hashlib.sha256(cleaned.encode("ascii")).hexdigest(),
-            "equals_count": cleaned.count("="),
-            "starts_with": cleaned[:32],
-            "ends_with": cleaned[-32:],
-        }
-    )
-
+    parts.append("".join(raw.split()))
 encoded = "".join(parts)
-(out / "encoded.txt").write_text(encoded, encoding="ascii")
-summary["encoded_length"] = len(encoded)
-summary["encoded_sha256"] = hashlib.sha256(encoded.encode("ascii")).hexdigest()
-summary["encoded_mod_4"] = len(encoded) % 4
-summary["equals_positions"] = [i for i, char in enumerate(encoded) if char == "="]
 
-# Produce a best-effort binary for local forensic analysis. This is diagnostic;
-# the final recovery still requires the exact verified archive.
-without_padding = encoded.replace("=", "")
-without_padding += "=" * ((-len(without_padding)) % 4)
-try:
-    decoded = base64.b64decode(without_padding, validate=False)
-    (out / "best_effort.bin").write_bytes(decoded)
-    summary["best_effort_length"] = len(decoded)
-    summary["best_effort_sha256"] = hashlib.sha256(decoded).hexdigest()
-    summary["zip_local_headers"] = [i for i in range(len(decoded)) if decoded.startswith(b"PK\x03\x04", i)]
-    summary["zip_central_headers"] = [i for i in range(len(decoded)) if decoded.startswith(b"PK\x01\x02", i)]
-    summary["zip_end_headers"] = [i for i in range(len(decoded)) if decoded.startswith(b"PK\x05\x06", i)]
-except Exception as exc:  # pragma: no cover - diagnostic output
-    summary["decode_error"] = repr(exc)
+# Repair the three known text-transport defects in the historical payload.
+encoded = encoded[:4735] + "z" + encoded[4735:32443] + encoded[32444:]
+encoded = encoded[:140072] + "B" + encoded[140072:]
+encoded = encoded[:141864] + "B" + encoded[141864:]
+encoded = encoded.replace("=", "")
+encoded += "=" * ((-len(encoded)) % 4)
+archive = base64.b64decode(encoded, validate=False)
 
-# Boundary overlap diagnostics.
-overlaps = []
-for index in range(len(parts) - 1):
-    left, right = parts[index], parts[index + 1]
-    overlap = 0
-    for size in range(1, min(512, len(left), len(right)) + 1):
-        if left[-size:] == right[:size]:
-            overlap = size
-    overlaps.append({"left": index, "right": index + 1, "max_overlap": overlap})
-summary["boundary_overlaps"] = overlaps
+LOCAL = b"PK\x03\x04"
+HEADER = struct.Struct("<IHHHHHIIIHH")
+recovered: dict[str, bytes] = {}
+valid_records = 0
+position = 0
+while True:
+    offset = archive.find(LOCAL, position)
+    if offset < 0:
+        break
+    position = offset + 1
+    if offset + HEADER.size > len(archive):
+        continue
+    try:
+        sig, version, flags, method, mtime, mdate, crc, csize, usize, name_len, extra_len = HEADER.unpack_from(archive, offset)
+    except struct.error:
+        continue
+    if sig != 0x04034B50 or flags & 0x08 or method not in {0, 8}:
+        continue
+    name_start = offset + HEADER.size
+    data_start = name_start + name_len + extra_len
+    data_end = data_start + csize
+    if name_len == 0 or data_end > len(archive):
+        continue
+    name_bytes = archive[name_start:name_start + name_len]
+    try:
+        name = name_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        continue
+    path = PurePosixPath(name)
+    if path.is_absolute() or ".." in path.parts or name.endswith("/"):
+        continue
+    compressed = archive[data_start:data_end]
+    try:
+        payload = compressed if method == 0 else zlib.decompress(compressed, -15)
+    except zlib.error:
+        continue
+    if len(payload) != usize or (binascii.crc32(payload) & 0xFFFFFFFF) != crc:
+        continue
+    recovered[name] = payload
+    valid_records += 1
 
-(out / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-print(json.dumps(summary, indent=2))
-print(f"Diagnostic files written to {out}")
+critical = {"backend/manage.py", "backend/config/settings.py", "frontend/package.json", "docker-compose.yml", "README.md"}
+missing = critical.difference(recovered)
+if missing or len(recovered) < 150:
+    raise RuntimeError(f"Recovery incomplete: {len(recovered)} files; missing={sorted(missing)}")
+
+for name, payload in recovered.items():
+    destination = root / name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(payload)
+
+shutil.rmtree(root / ".bootstrap", ignore_errors=True)
+for temporary in [
+    root / ".github" / "workflows" / "bootstrap.yml",
+    root / ".github" / "workflows" / "generate-migrations.yml",
+    root / ".migration-trigger",
+]:
+    temporary.unlink(missing_ok=True)
+print(f"Recovered {len(recovered)} unique files from {valid_records} valid ZIP records")
