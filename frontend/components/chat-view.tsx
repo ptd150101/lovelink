@@ -78,9 +78,13 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         setOtherReadMessageId(receipt.message_id);
       }
     });
+    const stopConnected = on("realtime.connected", () => {
+      void load().catch(() => {});
+    });
     return () => {
       stopCreated();
       stopRead();
+      stopConnected();
     };
   }, [conversationId, on]);
 
