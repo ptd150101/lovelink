@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
@@ -29,10 +27,11 @@ def blocked_user_ids(user):
     return ids
 
 
-@dataclass(frozen=True)
 class ModerationServiceError(Exception):
-    message: str
-    conflict: bool = False
+    def __init__(self, message: str, conflict: bool = False):
+        super().__init__(message)
+        self.message = message
+        self.conflict = conflict
 
     def __str__(self):
         return self.message
