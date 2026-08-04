@@ -16,10 +16,11 @@ The repository implements the complete frozen MVP checklist agreed for this proj
 - Private 1-to-1 realtime messaging after mutual connection, durable read receipts, unread counts, reconnect and REST catch-up for messages missed while the WebSocket was unavailable
 - Self-hosted LiveKit OSS 1-to-1 video calls with ringing, incoming-call recovery after reload/reconnect, accept, decline, cancel, missed call, end, webhook reconciliation, connection-quality display, camera switching and audio-only fallback
 - Manual identity verification with private evidence, challenge selfie, reviewer queue, signed evidence access, approve/reject/request-more-information, revocable badge and access/decision audit logs
-- Customized Django Admin workspaces for reviewers and moderators with structured actions
+- Customized Django Admin workspaces for reviewers and moderators with structured actions and enforceable encrypted TOTP MFA for staff accounts
 - In-app notifications plus preference-aware email notifications for connections, messages, verification outcomes and security warnings; message bursts are coalesced per conversation
 - Blocking, reporting, warnings, image/profile hiding, temporary suspension, permanent bans, badge revocation and moderation audit history
 - Account preferences, online-status privacy, blocked-user management, email changes, session revocation and deletion grace period
+- Optional Sentry integration, structured JSON logs and application health endpoint
 - Docker Compose, MinIO, PostgreSQL, Redis, Celery and LiveKit OSS
 - Backend unit/integration tests, frontend browser tests and a Docker-backed full-stack Playwright workflow using real Django, PostgreSQL, Redis, MinIO, session auth and WebSocket messaging
 
@@ -51,11 +52,14 @@ Then open:
 
 For local phone verification, `SMS_BACKEND=console` writes the OTP to backend logs. A deterministic `PHONE_OTP_FIXED_CODE` may be used only in local development or E2E testing and must remain empty in production.
 
-Create an admin account:
+Create an admin account and enroll its authenticator:
 
 ```bash
 docker compose exec backend python manage.py createsuperuser
+docker compose exec backend python manage.py enroll_staff_mfa admin@example.com
 ```
+
+After all staff accounts are enrolled, production may enforce MFA globally with `STAFF_MFA_REQUIRED=true`.
 
 Apply committed database migrations:
 
@@ -84,10 +88,11 @@ FULLSTACK_E2E=1 PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e -- --
 - Verification evidence is stored in a private bucket and exposed only through short-lived signed URLs; every reviewer access is audited.
 - A reviewer cannot approve a request until all required evidence types are present.
 - Phone OTP values are never stored in plaintext and verified phone numbers are never exposed publicly.
+- Staff TOTP secrets are encrypted at rest and accepted time steps cannot be replayed.
 - LiveKit API secrets stay server-side; browser tokens are room-specific and short-lived.
 - Profiles are visible only to authenticated active members.
 - Chat and calls require an accepted connection and are denied when either side blocks the other.
 - Presence is coarse, connection-only and disabled when the target user turns off online-status sharing.
-- Production must use HTTPS, a real SMTP/SMS provider, strong secrets, object-storage lifecycle rules, encrypted backups, staff MFA and a reviewed legal/privacy policy.
+- Production must use HTTPS, real SMTP/SMS providers, strong secrets, JSON log shipping, Sentry or equivalent monitoring, object-storage lifecycle rules, encrypted backups, enforced staff MFA and a reviewed legal/privacy policy.
 
 See `docs/` for the detailed architecture, API and operations guides.
