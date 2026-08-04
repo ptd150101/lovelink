@@ -147,6 +147,9 @@ class MyProfileSerializer(serializers.ModelSerializer):
     current_province = ProvinceSerializer(read_only=True)
     hometown_province = ProvinceSerializer(read_only=True)
     occupation_category = OccupationCategorySerializer(read_only=True)
+    is_phone_verified = serializers.BooleanField(
+        source="user.is_phone_verified", read_only=True
+    )
 
     class Meta:
         model = Profile
@@ -179,6 +182,7 @@ class MyProfileSerializer(serializers.ModelSerializer):
             "visibility_status",
             "completion_percent",
             "verification_level",
+            "is_phone_verified",
             "verified_at",
             "published_at",
         )
@@ -196,6 +200,9 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     occupation_category = OccupationCategorySerializer(read_only=True)
     connection_status = serializers.SerializerMethodField()
     presence = serializers.SerializerMethodField()
+    is_phone_verified = serializers.BooleanField(
+        source="user.is_phone_verified", read_only=True
+    )
 
     class Meta:
         model = Profile
@@ -223,6 +230,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             "interests",
             "photos",
             "verification_level",
+            "is_phone_verified",
             "verified_at",
             "completion_percent",
             "connection_status",
