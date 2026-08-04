@@ -19,6 +19,18 @@ const TERMINAL_CALL_EVENTS = new Set([
   "call.ended",
 ]);
 
+function validCall(value: unknown): value is CallSession {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<CallSession>;
+  return Boolean(
+    candidate.id &&
+      candidate.status &&
+      candidate.caller?.public_id &&
+      candidate.caller?.display_name &&
+      candidate.callee?.public_id,
+  );
+}
+
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const handlers = useRef(new Map<string, Set<Handler>>());
@@ -38,15 +50,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     async function recoverIncomingCall() {
       try {
-        const call = await api<CallSession | null>("/calls/incoming");
-        if (!stopped) setIncomingCall(call);
+        const response = await api<unknown>("/calls/incoming");
+        if (!stopped) setIncomingCall(validCall(response) ? response : null);
       } catch {
         // A transient recovery failure must not break the realtime connection.
       }
     }
 
     function dispatch(type: string, payload: any) {
-      if (type === "call.incoming") setIncomingCall(payload);
+      if (type === "call.incoming" && validCall(payload)) {
+        setIncomingCall(payload);
+      }
       if (TERMINAL_CALL_EVENTS.has(type)) {
         setIncomingCall((current) =>
           current && (!payload?.id || current.id === payload.id) ? null : current,
