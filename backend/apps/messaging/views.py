@@ -96,10 +96,10 @@ class MessageCreateView(APIView):
 class ConversationReadView(APIView):
     def post(self, request, pk):
         with transaction.atomic():
+            # Lock only the membership row. Joining nullable relations such as
+            # last_read_message while using FOR UPDATE is rejected by PostgreSQL.
             member = get_object_or_404(
-                ConversationMember.objects.select_for_update().select_related(
-                    "last_read_message", "user__profile"
-                ),
+                ConversationMember.objects.select_for_update(),
                 conversation_id=pk,
                 user=request.user,
             )
@@ -116,11 +116,12 @@ class ConversationReadView(APIView):
                 )
             if not message:
                 return Response(status=204)
-            if (
-                member.last_read_message
-                and member.last_read_message.created_at >= message.created_at
-            ):
-                return Response(status=204)
+            if member.last_read_message_id:
+                current_read_at = Message.objects.filter(
+                    pk=member.last_read_message_id
+                ).values_list("created_at", flat=True).first()
+                if current_read_at and current_read_at >= message.created_at:
+                    return Response(status=204)
             read_at = timezone.now()
             member.last_read_message = message
             member.last_read_at = read_at
