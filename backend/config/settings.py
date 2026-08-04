@@ -53,7 +53,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = "config.urls"
 TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates",
-    "DIRS": [],
+    "DIRS": [BASE_DIR / "templates"],
     "APP_DIRS": True,
     "OPTIONS": {"context_processors": [
         "django.template.context_processors.request",
@@ -136,6 +136,7 @@ CELERY_BEAT_SCHEDULE = {
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "LoveLink <noreply@lovelink.local>")
+EMAIL_MESSAGE_NOTIFICATION_DELAY = int(env("EMAIL_MESSAGE_NOTIFICATION_DELAY", "300"))
 
 S3_ENDPOINT_URL = env("S3_ENDPOINT_URL", "http://localhost:9000")
 S3_PUBLIC_ENDPOINT_URL = env("S3_PUBLIC_ENDPOINT_URL", S3_ENDPOINT_URL)
