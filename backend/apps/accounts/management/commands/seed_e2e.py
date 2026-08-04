@@ -2,6 +2,7 @@ from datetime import date
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from apps.connections.models import ConnectionRequest
 from apps.messaging.models import Conversation, ConversationMember, Message
@@ -68,10 +69,13 @@ class Command(BaseCommand):
             defaults={
                 "intro_message": "Chào bạn, mình muốn làm quen.",
                 "status": ConnectionRequest.Status.ACCEPTED,
+                "expires_at": timezone.now() + timezone.timedelta(days=30),
             },
         )
         connection.status = ConnectionRequest.Status.ACCEPTED
-        connection.save(update_fields=["status"])
+        if not connection.expires_at:
+            connection.expires_at = timezone.now() + timezone.timedelta(days=30)
+        connection.save(update_fields=["status", "expires_at"])
         conversation, _ = Conversation.objects.get_or_create(
             connection_request=connection
         )
