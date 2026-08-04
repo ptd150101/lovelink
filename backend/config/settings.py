@@ -47,6 +47,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -110,6 +111,12 @@ USE_I18N = True
 USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"
+    },
+}
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -221,7 +228,9 @@ S3_REGION = env("S3_REGION", "auto")
 
 LIVEKIT_URL = env("LIVEKIT_URL", "ws://localhost:7880")
 LIVEKIT_API_KEY = env("LIVEKIT_API_KEY", "devkey")
-LIVEKIT_API_SECRET = env("LIVEKIT_API_SECRET", "devsecret")
+LIVEKIT_API_SECRET = env(
+    "LIVEKIT_API_SECRET", "devsecret-devsecret-devsecret-123456"
+)
 
 EMAIL_VERIFY_MAX_AGE = 60 * 60 * 24
 PASSWORD_RESET_MAX_AGE = 60 * 30
