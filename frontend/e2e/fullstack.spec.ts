@@ -47,7 +47,9 @@ test("real backend supports realtime chat, receipts and a LiveKit call", async (
   await expect(second).toHaveURL(/\/calls\//);
   await expect(first.locator(".video-stage")).toBeVisible({ timeout: 20_000 });
   await expect(second.locator(".video-stage")).toBeVisible({ timeout: 20_000 });
-  await expect(first.getByText(/Kết nối|Đang đo chất lượng/)).toBeVisible();
+  const connectionQuality = first.locator(".connection-quality");
+  await expect(connectionQuality).toBeVisible();
+  await expect(connectionQuality).toContainText(/Kết nối|Đang đo chất lượng/);
 
   await first.getByRole("button", { name: /Kết thúc/ }).click();
   await expect(first).toHaveURL(/\/messages/);
