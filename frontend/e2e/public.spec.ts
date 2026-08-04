@@ -29,9 +29,9 @@ test("landing and authentication pages render", async ({ page }) => {
   await page.goto("/auth/login");
   await expect(page.getByRole("heading", { name: "Chào mừng trở lại", exact: true })).toBeVisible();
   await page.goto("/auth/register");
-  await expect(page.getByRole("heading", { name: /đăng ký/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tạo tài khoản LoveLink", exact: true })).toBeVisible();
   await page.goto("/auth/forgot-password");
-  await expect(page.getByRole("heading", { name: /quên mật khẩu/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quên mật khẩu", exact: true })).toBeVisible();
 });
 
 test("authenticated member can discover and inspect a verified profile", async ({ page }) => {
