@@ -10,11 +10,15 @@ class CompactUserSerializer(serializers.Serializer):
     public_id = serializers.UUIDField(source="profile.public_id")
     display_name = serializers.CharField(source="profile.display_name")
     verification_level = serializers.CharField(source="profile.verification_level")
+    is_phone_verified = serializers.BooleanField()
     primary_photo = serializers.SerializerMethodField()
     presence = serializers.SerializerMethodField()
 
     def get_primary_photo(self, obj):
-        photo = obj.profile.photos.filter(is_primary=True).first() or obj.profile.photos.first()
+        photo = (
+            obj.profile.photos.filter(is_primary=True).first()
+            or obj.profile.photos.first()
+        )
         return ProfilePhotoSerializer(photo).data if photo else None
 
     def get_presence(self, obj):

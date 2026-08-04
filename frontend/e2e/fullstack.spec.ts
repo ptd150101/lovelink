@@ -11,9 +11,13 @@ async function login(page: Page, email: string, password: string) {
   await expect(page).toHaveURL(/\/discover/);
 }
 
-test("real backend supports realtime chat and incoming-call recovery", async ({ browser }) => {
-  const firstContext = await browser.newContext();
-  const secondContext = await browser.newContext();
+test("real backend supports realtime chat, receipts and a LiveKit call", async ({ browser }) => {
+  const firstContext = await browser.newContext({
+    permissions: ["camera", "microphone"],
+  });
+  const secondContext = await browser.newContext({
+    permissions: ["camera", "microphone"],
+  });
   const first = await firstContext.newPage();
   const second = await secondContext.newPage();
 
@@ -29,20 +33,50 @@ test("real backend supports realtime chat and incoming-call recovery", async ({ 
   await first.getByPlaceholder("Nhập tin nhắn…").fill(text);
   await first.locator(".composer button").click();
   await expect(second.getByText(text)).toBeVisible({ timeout: 15_000 });
+  await expect(first.getByText("Đã xem").last()).toBeVisible({ timeout: 15_000 });
 
   await first.getByTitle("Gọi video").click();
   await expect(first).toHaveURL(/\/calls\//);
 
+  // Reloading the callee proves the pending call is recovered through REST.
   await second.reload();
-  await expect(second.getByText("đang gọi video cho bạn")).toBeVisible({ timeout: 15_000 });
-  await second.getByRole("button", { name: /Từ chối/ }).click();
-  await expect(first).toHaveURL(/\/messages/, { timeout: 15_000 });
+  await expect(second.getByText("đang gọi video cho bạn")).toBeVisible({
+    timeout: 15_000,
+  });
+  await second.getByRole("button", { name: /Trả lời/ }).click();
+  await expect(second).toHaveURL(/\/calls\//);
+  await expect(first.locator(".video-stage")).toBeVisible({ timeout: 20_000 });
+  await expect(second.locator(".video-stage")).toBeVisible({ timeout: 20_000 });
+  const connectionQuality = first.locator(".connection-quality");
+  await expect(connectionQuality).toBeVisible();
+  await expect(connectionQuality).toContainText(/Kết nối|Đang đo chất lượng/);
+
+  await first.getByRole("button", { name: /Kết thúc/ }).click();
+  await expect(first).toHaveURL(/\/messages/);
+  await expect(second).toHaveURL(/\/messages/, { timeout: 15_000 });
 
   await firstContext.close();
   await secondContext.close();
 });
 
+test("member can verify a private phone number through OTP", async ({ page }) => {
+  await login(page, "e2e.a@lovelink.local", "E2EPassword123!");
+  await page.goto("/settings/security");
+  await page.getByLabel("Số điện thoại").fill("0901234567");
+  await page.getByRole("button", { name: /Gửi mã OTP/ }).click();
+  await expect(page.getByText(/Mã OTP đã được gửi/)).toBeVisible();
+  await page.getByLabel("Mã OTP 6 chữ số").fill("123456");
+  await page.getByRole("button", { name: "Xác minh", exact: true }).click();
+  await expect(page.getByText("Xác minh số điện thoại thành công.")).toBeVisible();
+  await expect(page.getByText("Đã xác minh", { exact: true })).toBeVisible();
+});
+
 test("reviewer and moderator workflows are usable in Django admin", async ({ page }) => {
+  const staticAsset = await page.request.get(
+    "http://localhost:8000/static/admin/css/base.css",
+  );
+  expect(staticAsset.ok()).toBeTruthy();
+
   await page.goto("http://localhost:8000/admin/login/?next=/admin/");
   await page.locator('input[name="username"]').fill("e2e.admin@lovelink.local");
   await page.locator('input[name="password"]').fill("E2EAdminPassword123!");

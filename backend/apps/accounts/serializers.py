@@ -1,7 +1,32 @@
+import re
 from datetime import date
+
+from django.conf import settings
 from django.contrib.auth import authenticate, password_validation
 from rest_framework import serializers
+
 from .models import User, UserPreference
+from .security import clear_login_failures, login_is_locked, record_login_failure
+
+
+PHONE_CLEAN_RE = re.compile(r"[\s().-]+")
+PHONE_E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+
+
+def normalize_phone(value: str) -> str:
+    value = PHONE_CLEAN_RE.sub("", str(value or "").strip())
+    if value.startswith("00"):
+        value = f"+{value[2:]}"
+    elif value.startswith("0"):
+        value = f"+{settings.PHONE_DEFAULT_COUNTRY_CODE}{value[1:]}"
+    elif value and not value.startswith("+"):
+        value = f"+{value}"
+    if not PHONE_E164_RE.fullmatch(value):
+        raise serializers.ValidationError(
+            "Số điện thoại không hợp lệ. Hãy nhập theo dạng +84901234567."
+        )
+    return value
+
 
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -9,50 +34,109 @@ class RegisterSerializer(serializers.Serializer):
     password_confirm = serializers.CharField(write_only=True)
     birth_date = serializers.DateField(write_only=True)
     accept_terms = serializers.BooleanField(write_only=True)
+
     def validate_email(self, value):
         value = value.lower().strip()
-        if User.objects.filter(email=value).exists(): raise serializers.ValidationError("Không thể đăng ký bằng email này.")
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Không thể đăng ký bằng email này.")
         return value
+
     def validate(self, attrs):
-        if attrs["password"] != attrs["password_confirm"]: raise serializers.ValidationError({"password_confirm": "Mật khẩu không khớp."})
-        if not attrs["accept_terms"]: raise serializers.ValidationError({"accept_terms": "Bạn phải đồng ý điều khoản."})
-        today=date.today(); born=attrs["birth_date"]
-        years=today.year-born.year-((today.month,today.day)<(born.month,born.day))
-        if years < 18: raise serializers.ValidationError({"birth_date": "Bạn phải từ 18 tuổi."})
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError(
+                {"password_confirm": "Mật khẩu không khớp."}
+            )
+        if not attrs["accept_terms"]:
+            raise serializers.ValidationError(
+                {"accept_terms": "Bạn phải đồng ý điều khoản."}
+            )
+        today = date.today()
+        born = attrs["birth_date"]
+        years = today.year - born.year - (
+            (today.month, today.day) < (born.month, born.day)
+        )
+        if years < 18:
+            raise serializers.ValidationError(
+                {"birth_date": "Bạn phải từ 18 tuổi."}
+            )
         password_validation.validate_password(attrs["password"])
         return attrs
+
     def create(self, validated):
-        birth_date=validated.pop("birth_date"); validated.pop("password_confirm"); validated.pop("accept_terms")
-        user=User.objects.create_user(**validated)
-        user.pending_birth_date=birth_date
+        birth_date = validated.pop("birth_date")
+        validated.pop("password_confirm")
+        validated.pop("accept_terms")
+        user = User.objects.create_user(**validated)
+        user.pending_birth_date = birth_date
         return user
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
     remember = serializers.BooleanField(default=False)
+
     def validate(self, attrs):
-        user=authenticate(self.context["request"], email=attrs["email"].lower(), password=attrs["password"])
-        if not user: raise serializers.ValidationError("Email hoặc mật khẩu không chính xác.")
-        if user.status not in [User.Status.ACTIVE,User.Status.SCHEDULED_DELETION] or not user.is_active: raise serializers.ValidationError("Tài khoản hiện không thể đăng nhập.")
-        attrs["user"]=user; return attrs
+        request = self.context["request"]
+        email = attrs["email"].lower().strip()
+        ip_address = request.META.get(
+            "HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "")
+        ).split(",")[0].strip()
+        generic_error = "Email hoặc mật khẩu không chính xác."
+        if login_is_locked(email, ip_address):
+            raise serializers.ValidationError(generic_error)
+        user = authenticate(
+            request,
+            email=email,
+            password=attrs["password"],
+        )
+        if not user:
+            record_login_failure(email, ip_address)
+            raise serializers.ValidationError(generic_error)
+        if (
+            user.status not in [User.Status.ACTIVE, User.Status.SCHEDULED_DELETION]
+            or not user.is_active
+        ):
+            record_login_failure(email, ip_address)
+            raise serializers.ValidationError(generic_error)
+        clear_login_failures(email, ip_address)
+        attrs["user"] = user
+        return attrs
+
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    token=serializers.CharField(); password=serializers.CharField(min_length=10); password_confirm=serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(min_length=10)
+    password_confirm = serializers.CharField()
+
     def validate(self, attrs):
-        if attrs["password"] != attrs["password_confirm"]: raise serializers.ValidationError({"password_confirm":"Mật khẩu không khớp."})
-        password_validation.validate_password(attrs["password"]); return attrs
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError(
+                {"password_confirm": "Mật khẩu không khớp."}
+            )
+        password_validation.validate_password(attrs["password"])
+        return attrs
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model=User
-        fields=("id","email","phone","status","is_email_verified","is_phone_verified","created_at")
+        model = User
+        fields = (
+            "id",
+            "email",
+            "phone",
+            "status",
+            "is_email_verified",
+            "is_phone_verified",
+            "created_at",
+        )
 
 
 class UserPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPreference
         exclude = ("user",)
+
 
 class EmailChangeSerializer(serializers.Serializer):
     new_email = serializers.EmailField()
@@ -63,3 +147,23 @@ class EmailChangeSerializer(serializers.Serializer):
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Không thể sử dụng email này.")
         return value
+
+
+class PhoneSendSerializer(serializers.Serializer):
+    phone = serializers.CharField(max_length=32)
+
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        user = self.context["request"].user
+        if User.objects.filter(phone=phone).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError(
+                "Số điện thoại này đã được sử dụng bởi tài khoản khác."
+            )
+        return phone
+
+
+class PhoneVerifySerializer(PhoneSendSerializer):
+    code = serializers.RegexField(
+        regex=r"^\d{6}$",
+        error_messages={"invalid": "Mã OTP phải gồm đúng 6 chữ số."},
+    )

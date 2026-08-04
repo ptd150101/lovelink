@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Flag, Send, UserX, Video } from "lucide-react";
+import { BadgeCheck, Flag, Send, UserX, Video } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Conversation, Message, Presence } from "@/lib/types";
+import type {
+  Conversation,
+  Message,
+  MessageReadReceipt,
+  Presence,
+} from "@/lib/types";
 import { useRealtime } from "./realtime-provider";
 import { Button, Textarea } from "./ui";
 import { formatDate } from "@/lib/utils";
@@ -19,9 +24,13 @@ function presenceLabel(presence?: Presence | null) {
 export function ChatView({ conversationId }: { conversationId: string }) {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [otherReadMessageId, setOtherReadMessageId] = useState<string | null>(
+    null,
+  );
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
+  const otherUserId = useRef<string | null>(null);
   const router = useRouter();
   const { on } = useRealtime();
 
@@ -31,6 +40,10 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       api<any>(`/conversations/${conversationId}/messages`),
     ]);
     setConversation(conversationData);
+    otherUserId.current = conversationData.other_user.public_id;
+    setOtherReadMessageId(
+      conversationData.other_last_read_message_id || null,
+    );
     const values = (messageData.results || messageData).slice().reverse();
     setMessages(values);
     const last = values.at(-1);
@@ -43,8 +56,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   }
 
   useEffect(() => {
-    load();
-    return on("message.created", (message: Message) => {
+    void load();
+    const stopCreated = on("message.created", (message: Message) => {
       if (message.conversation === conversationId) {
         setMessages((current) =>
           current.some((item) => item.id === message.id)
@@ -57,11 +70,43 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         }).catch(() => {});
       }
     });
-  }, [conversationId]);
+    const stopRead = on("message.read", (receipt: MessageReadReceipt) => {
+      if (
+        receipt.conversation_id === conversationId &&
+        receipt.reader_public_id === otherUserId.current
+      ) {
+        setOtherReadMessageId(receipt.message_id);
+      }
+    });
+    const stopConnected = on("realtime.connected", () => {
+      void load().catch(() => {});
+    });
+    return () => {
+      stopCreated();
+      stopRead();
+      stopConnected();
+    };
+  }, [conversationId, on]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, otherReadMessageId]);
+
+  const lastReadOwnMessageId = useMemo(() => {
+    if (!conversation || !otherReadMessageId) return null;
+    const readThrough = messages.findIndex(
+      (message) => message.id === otherReadMessageId,
+    );
+    if (readThrough < 0) return null;
+    for (let index = readThrough; index >= 0; index -= 1) {
+      if (
+        messages[index].sender_public_id !== conversation.other_user.public_id
+      ) {
+        return messages[index].id;
+      }
+    }
+    return null;
+  }, [conversation, messages, otherReadMessageId]);
 
   async function send() {
     if (!text.trim()) return;
@@ -144,10 +189,17 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           )}
         </div>
         <div className="grow">
-          <b>{conversation.other_user.display_name}</b>
-          <small>
-            {presenceLabel(conversation.other_user.presence)}
-          </small>
+          <b>
+            {conversation.other_user.display_name}
+            {conversation.other_user.is_phone_verified && (
+              <BadgeCheck
+                className="phone-verified-icon"
+                size={15}
+                aria-label="Đã xác minh số điện thoại"
+              />
+            )}
+          </b>
+          <small>{presenceLabel(conversation.other_user.presence)}</small>
         </div>
         <Button variant="ghost" title="Gọi video" onClick={call}>
           <Video />
@@ -160,19 +212,22 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         </Button>
       </header>
       <div className="messages">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`bubble ${
-              message.sender_public_id === conversation.other_user.public_id
-                ? "theirs"
-                : "mine"
-            }`}
-          >
-            <p>{message.text}</p>
-            <small>{formatDate(message.created_at)}</small>
-          </div>
-        ))}
+        {messages.map((message) => {
+          const mine =
+            message.sender_public_id !== conversation.other_user.public_id;
+          return (
+            <div
+              key={message.id}
+              className={`bubble ${mine ? "mine" : "theirs"}`}
+            >
+              <p>{message.text}</p>
+              <small>{formatDate(message.created_at)}</small>
+              {mine && message.id === lastReadOwnMessageId && (
+                <small className="read-receipt">Đã xem</small>
+              )}
+            </div>
+          );
+        })}
         <div ref={bottom} />
       </div>
       {error && <div className="error-inline">{error}</div>}
@@ -185,12 +240,12 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              send();
+              void send();
             }
           }}
           placeholder="Nhập tin nhắn…"
         />
-        <Button onClick={send}>
+        <Button onClick={() => void send()}>
           <Send size={18} />
         </Button>
       </div>

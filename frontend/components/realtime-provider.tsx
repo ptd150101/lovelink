@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { api } from "@/lib/api";
 import type { CallSession } from "@/lib/types";
 import { useAuth } from "./auth-provider";
@@ -35,6 +42,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const handlers = useRef(new Map<string, Set<Handler>>());
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
+
+  const on = useCallback((event: string, handler: Handler) => {
+    if (!handlers.current.has(event)) {
+      handlers.current.set(event, new Set());
+    }
+    handlers.current.get(event)!.add(handler);
+    return () => handlers.current.get(event)?.delete(handler);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -77,8 +92,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       socket = new WebSocket(
         process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/app",
       );
-      socket.onopen = () => {
-        recoverIncomingCall();
+      socket.onopen = async () => {
+        await recoverIncomingCall();
+        if (!stopped) {
+          dispatch("realtime.connected", { recovered_at: new Date().toISOString() });
+        }
         heartbeatTimer = setInterval(() => {
           if (socket?.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: "presence.ping" }));
@@ -99,7 +117,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    recoverIncomingCall();
+    void recoverIncomingCall();
     recoveryTimer = setInterval(recoverIncomingCall, 10_000);
     connect();
 
@@ -115,13 +133,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   return (
     <RealtimeContext.Provider
       value={{
-        on: (event, handler) => {
-          if (!handlers.current.has(event)) {
-            handlers.current.set(event, new Set());
-          }
-          handlers.current.get(event)!.add(handler);
-          return () => handlers.current.get(event)?.delete(handler);
-        },
+        on,
         incomingCall,
         clearIncoming: () => setIncomingCall(null),
       }}
