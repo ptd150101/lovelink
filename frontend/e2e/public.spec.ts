@@ -81,10 +81,11 @@ async function mockAuthenticatedApi(page: Page) {
 }
 
 test("landing and authentication pages render", async ({ page }) => {
+  await page.route("**/api/v1/auth/me", route => route.fulfill({ status: 401, json: { detail: "Unauthenticated" } }));
   await page.goto("/");
   await expect(page.getByText("LoveLink").first()).toBeVisible();
   await page.goto("/auth/login");
-  await expect(page.getByRole("heading", { name: /đăng nhập/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Chào mừng trở lại", exact: true })).toBeVisible();
   await page.goto("/auth/register");
   await expect(page.getByRole("heading", { name: /đăng ký/i })).toBeVisible();
   await page.goto("/auth/forgot-password");
@@ -110,11 +111,11 @@ test("connections, messages and verification entry points are usable", async ({ 
   await expect(page.getByText("Chào Mai, mình cũng thích đọc sách.")).toBeVisible();
   await page.getByRole("button", { name: "Chấp nhận" }).click();
   await page.goto("/messages");
-  await expect(page.getByRole("heading", { name: "Hội thoại" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hội thoại", exact: true })).toBeVisible();
   await expect(page.getByText("Hẹn bạn cuối tuần nhé")).toBeVisible();
   await page.goto("/verification");
   await expect(page.getByRole("heading", { name: "Xác minh danh tính" })).toBeVisible();
   await page.getByRole("button", { name: "Tạo yêu cầu xác minh" }).click();
-  await expect(page.getByText("ABC123")).toBeVisible();
+  await expect(page.getByText("ABC123").first()).toBeVisible();
   await expect(page.getByText("Mặt trước giấy tờ")).toBeVisible();
 });
