@@ -2,18 +2,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import io
-import shutil
+import json
 import subprocess
-import zipfile
 from pathlib import Path
 
 EXPECTED_BASE64_SHA256 = "c85692cf17c8e2585f4183eae9c4c79e03c9c232428dbde4e32d67448d17da77"
 EXPECTED_ARCHIVE_SHA256 = "99e08f536e2c884634c1559d7be496ef4a6c95b738986694d5c75591ee9f76fc"
 
-# The original payload chunks were committed independently. Several files in the
-# current tree were later damaged while being split, so recover the immutable
-# versions directly from the commits that introduced them.
 PAYLOAD_SOURCES = [
     ("1770e5909a2f4e64c9df55e75ecbf51cef310e2c", ".bootstrap/payload_00.part"),
     ("f8dc24f2530d98a36c26ad8c1f28ea6663ef0987", ".bootstrap/payload_01.part"),
@@ -28,49 +23,66 @@ PAYLOAD_SOURCES = [
 ]
 
 root = Path(__file__).resolve().parents[1]
-clean_parts: list[str] = []
-for commit, path in PAYLOAD_SOURCES:
-    raw = subprocess.check_output(
-        ["git", "show", f"{commit}:{path}"],
-        cwd=root,
-        text=True,
-    )
+out = Path("/tmp/lovelink-recovery")
+out.mkdir(parents=True, exist_ok=True)
+parts: list[str] = []
+summary: dict[str, object] = {
+    "expected_base64_sha256": EXPECTED_BASE64_SHA256,
+    "expected_archive_sha256": EXPECTED_ARCHIVE_SHA256,
+    "parts": [],
+}
+
+for index, (commit, path) in enumerate(PAYLOAD_SOURCES):
+    raw = subprocess.check_output(["git", "show", f"{commit}:{path}"], cwd=root, text=True)
     cleaned = "".join(raw.split())
-    clean_parts.append(cleaned)
-    print(f"Recovered {path} from {commit[:8]} ({len(cleaned)} chars)")
-
-encoded = "".join(clean_parts)
-encoded_digest = hashlib.sha256(encoded.encode("ascii")).hexdigest()
-if encoded_digest != EXPECTED_BASE64_SHA256:
-    raise RuntimeError(
-        f"Payload checksum mismatch: expected {EXPECTED_BASE64_SHA256}, got {encoded_digest}"
+    parts.append(cleaned)
+    (out / f"part_{index:02d}.txt").write_text(cleaned, encoding="ascii")
+    summary["parts"].append(
+        {
+            "index": index,
+            "commit": commit,
+            "path": path,
+            "length": len(cleaned),
+            "sha256": hashlib.sha256(cleaned.encode("ascii")).hexdigest(),
+            "equals_count": cleaned.count("="),
+            "starts_with": cleaned[:32],
+            "ends_with": cleaned[-32:],
+        }
     )
 
-archive_bytes = base64.b64decode(encoded, validate=True)
-archive_digest = hashlib.sha256(archive_bytes).hexdigest()
-if archive_digest != EXPECTED_ARCHIVE_SHA256:
-    raise RuntimeError(
-        f"Archive checksum mismatch: expected {EXPECTED_ARCHIVE_SHA256}, got {archive_digest}"
-    )
+encoded = "".join(parts)
+(out / "encoded.txt").write_text(encoded, encoding="ascii")
+summary["encoded_length"] = len(encoded)
+summary["encoded_sha256"] = hashlib.sha256(encoded.encode("ascii")).hexdigest()
+summary["encoded_mod_4"] = len(encoded) % 4
+summary["equals_positions"] = [i for i, char in enumerate(encoded) if char == "="]
 
-with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
-    bad_member = archive.testzip()
-    if bad_member is not None:
-        raise RuntimeError(f"Corrupted archive member: {bad_member}")
-    for member in archive.infolist():
-        destination = (root / member.filename).resolve()
-        if root.resolve() not in destination.parents and destination != root.resolve():
-            raise RuntimeError(f"Unsafe archive path: {member.filename}")
-    archive.extractall(root)
+# Produce a best-effort binary for local forensic analysis. This is diagnostic;
+# the final recovery still requires the exact verified archive.
+without_padding = encoded.replace("=", "")
+without_padding += "=" * ((-len(without_padding)) % 4)
+try:
+    decoded = base64.b64decode(without_padding, validate=False)
+    (out / "best_effort.bin").write_bytes(decoded)
+    summary["best_effort_length"] = len(decoded)
+    summary["best_effort_sha256"] = hashlib.sha256(decoded).hexdigest()
+    summary["zip_local_headers"] = [i for i in range(len(decoded)) if decoded.startswith(b"PK\x03\x04", i)]
+    summary["zip_central_headers"] = [i for i in range(len(decoded)) if decoded.startswith(b"PK\x01\x02", i)]
+    summary["zip_end_headers"] = [i for i in range(len(decoded)) if decoded.startswith(b"PK\x05\x06", i)]
+except Exception as exc:  # pragma: no cover - diagnostic output
+    summary["decode_error"] = repr(exc)
 
-# Remove transport-only files so the final repository contains normal source.
-shutil.rmtree(root / ".bootstrap", ignore_errors=True)
-for path in [
-    root / ".github" / "workflows" / "bootstrap.yml",
-    root / ".github" / "workflows" / "generate-migrations.yml",
-    root / ".migration-trigger",
-]:
-    if path.exists():
-        path.unlink()
+# Boundary overlap diagnostics.
+overlaps = []
+for index in range(len(parts) - 1):
+    left, right = parts[index], parts[index + 1]
+    overlap = 0
+    for size in range(1, min(512, len(left), len(right)) + 1):
+        if left[-size:] == right[:size]:
+            overlap = size
+    overlaps.append({"left": index, "right": index + 1, "max_overlap": overlap})
+summary["boundary_overlaps"] = overlaps
 
-print(f"Extracted {len(archive_bytes)} bytes of LoveLink source successfully")
+(out / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+print(json.dumps(summary, indent=2))
+print(f"Diagnostic files written to {out}")
