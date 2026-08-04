@@ -6,7 +6,7 @@ rtc:
   udp_port: 7882
   use_external_ip: false
 keys:
-  devkey: devsecret
+  devkey: devsecret-devsecret-devsecret-123456
 webhook:
   api_key: devkey
   urls:
