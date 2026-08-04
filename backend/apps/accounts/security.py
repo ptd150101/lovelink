@@ -1,4 +1,5 @@
 import hashlib
+import os
 
 from django.conf import settings
 from django.core.cache import cache
@@ -6,6 +7,10 @@ from django.core.cache import cache
 
 def _digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _number_setting(name: str, default: int) -> int:
+    return int(os.getenv(name, getattr(settings, name, default)))
 
 
 def _keys(email: str, ip_address: str):
@@ -22,15 +27,18 @@ def _keys(email: str, ip_address: str):
 
 def login_is_locked(email: str, ip_address: str) -> bool:
     keys = _keys(email, ip_address)
-    return bool(cache.get(keys["identity_lock"]) or cache.get(keys["identity_ip_lock"]))
+    return bool(
+        cache.get(keys["identity_lock"])
+        or cache.get(keys["identity_ip_lock"])
+    )
 
 
 def record_login_failure(email: str, ip_address: str) -> bool:
     keys = _keys(email, ip_address)
-    window = getattr(settings, "LOGIN_FAILURE_WINDOW_SECONDS", 900)
-    lock_seconds = getattr(settings, "LOGIN_LOCKOUT_SECONDS", 900)
-    identity_limit = getattr(settings, "LOGIN_IDENTITY_FAILURE_LIMIT", 8)
-    identity_ip_limit = getattr(settings, "LOGIN_IDENTITY_IP_FAILURE_LIMIT", 5)
+    window = _number_setting("LOGIN_FAILURE_WINDOW_SECONDS", 900)
+    lock_seconds = _number_setting("LOGIN_LOCKOUT_SECONDS", 900)
+    identity_limit = _number_setting("LOGIN_IDENTITY_FAILURE_LIMIT", 8)
+    identity_ip_limit = _number_setting("LOGIN_IDENTITY_IP_FAILURE_LIMIT", 5)
     locked = False
 
     for failure_key, lock_key, limit in [
