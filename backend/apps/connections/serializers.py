@@ -1,0 +1,22 @@
+from rest_framework import serializers
+from apps.profiles.serializers import ProfilePhotoSerializer
+from .models import ConnectionRequest
+
+class CompactUserSerializer(serializers.Serializer):
+    public_id=serializers.UUIDField(source="profile.public_id")
+    display_name=serializers.CharField(source="profile.display_name")
+    verification_level=serializers.CharField(source="profile.verification_level")
+    primary_photo=serializers.SerializerMethodField()
+    def get_primary_photo(self,obj):
+        p=obj.profile.photos.filter(is_primary=True).first() or obj.profile.photos.first()
+        return ProfilePhotoSerializer(p).data if p else None
+
+class ConnectionRequestSerializer(serializers.ModelSerializer):
+    sender=CompactUserSerializer(read_only=True);receiver=CompactUserSerializer(read_only=True)
+    other_user=serializers.SerializerMethodField()
+    class Meta:model=ConnectionRequest;fields=("id","sender","receiver","other_user","intro_message","status","sent_at","responded_at","expires_at")
+    def get_other_user(self,obj):
+        request=self.context.get("request")
+        if not request:return None
+        other=obj.receiver if obj.sender_id==request.user.id else obj.sender
+        return CompactUserSerializer(other).data

@@ -1,0 +1,1 @@
+import Link from "next/link";export function SettingsNav(){return <nav className="settings-nav"><Link href="/settings/account">Tài khoản</Link><Link href="/settings/privacy">Quyền riêng tư</Link><Link href="/settings/notifications">Thông báo</Link><Link href="/settings/security">Bảo mật</Link><Link href="/settings/blocked-users">Đã chặn</Link></nav>}

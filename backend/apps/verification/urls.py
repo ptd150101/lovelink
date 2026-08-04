@@ -1,0 +1,3 @@
+from django.urls import path
+from .views import *
+urlpatterns=[path("verification/current",VerificationCurrentView.as_view()),path("verification/requests",VerificationCreateView.as_view()),path("verification/evidence/presign",EvidencePresignView.as_view()),path("verification/evidence/complete",EvidenceCompleteView.as_view()),path("verification/<uuid:pk>/submit",VerificationSubmitView.as_view()),path("staff/verification",StaffVerificationListView.as_view()),path("staff/verification/<uuid:pk>",StaffVerificationDetailView.as_view()),path("staff/verification/<uuid:pk>/action",StaffVerificationActionView.as_view())]
