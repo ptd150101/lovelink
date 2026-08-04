@@ -70,6 +70,11 @@ test("member can verify a private phone number through OTP", async ({ page }) =>
 });
 
 test("reviewer and moderator workflows are usable in Django admin", async ({ page }) => {
+  const staticAsset = await page.request.get(
+    "http://localhost:8000/static/admin/css/base.css",
+  );
+  expect(staticAsset.ok()).toBeTruthy();
+
   await page.goto("http://localhost:8000/admin/login/?next=/admin/");
   await page.locator('input[name="username"]').fill("e2e.admin@lovelink.local");
   await page.locator('input[name="password"]').fill("E2EAdminPassword123!");
