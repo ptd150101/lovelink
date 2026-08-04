@@ -1,0 +1,30 @@
+# Copy outside the repository, replace domains and use production service names.
+# TURN/TLS media is configured directly in LiveKit and is not proxied by Caddy.
+
+{$APP_DOMAIN} {
+  encode zstd gzip
+
+  @api path /api/* /healthz /admin/* /static/*
+  handle @api {
+    reverse_proxy backend:8000
+  }
+
+  @websocket path /ws/*
+  handle @websocket {
+    reverse_proxy backend:8000
+  }
+
+  handle {
+    reverse_proxy frontend:3000
+  }
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
+
+{$RTC_DOMAIN} {
+  reverse_proxy livekit:7880
+}
