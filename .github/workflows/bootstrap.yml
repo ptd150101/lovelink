@@ -1,11 +1,6 @@
 name: Recover LoveLink source
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".bootstrap/apply_payload.py"
-      - ".github/workflows/bootstrap.yml"
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -19,26 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Recover and extract source
+      - name: Produce recovery diagnostics
         run: python .bootstrap/apply_payload.py
-      - name: Package recovered source for inspection
-        run: tar --exclude=.git -czf /tmp/lovelink-source.tar.gz .
       - uses: actions/upload-artifact@v4
         with:
-          name: lovelink-recovered-source
-          path: /tmp/lovelink-source.tar.gz
+          name: lovelink-recovery-diagnostics
+          path: /tmp/lovelink-recovery
           retention-days: 7
-      - name: Commit recovered source
-        env:
-          TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "feat: restore complete LoveLink MVP source"
-          git push origin HEAD:${TARGET_BRANCH}
