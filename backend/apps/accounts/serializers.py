@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate, password_validation
 from rest_framework import serializers
 
 from .models import User, UserPreference
+from .security import clear_login_failures, login_is_locked, record_login_failure
 
 
 PHONE_CLEAN_RE = re.compile(r"[\s().-]+")
@@ -76,18 +77,29 @@ class LoginSerializer(serializers.Serializer):
     remember = serializers.BooleanField(default=False)
 
     def validate(self, attrs):
+        request = self.context["request"]
+        email = attrs["email"].lower().strip()
+        ip_address = request.META.get(
+            "HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "")
+        ).split(",")[0].strip()
+        generic_error = "Email hoặc mật khẩu không chính xác."
+        if login_is_locked(email, ip_address):
+            raise serializers.ValidationError(generic_error)
         user = authenticate(
-            self.context["request"],
-            email=attrs["email"].lower(),
+            request,
+            email=email,
             password=attrs["password"],
         )
         if not user:
-            raise serializers.ValidationError("Email hoặc mật khẩu không chính xác.")
+            record_login_failure(email, ip_address)
+            raise serializers.ValidationError(generic_error)
         if (
             user.status not in [User.Status.ACTIVE, User.Status.SCHEDULED_DELETION]
             or not user.is_active
         ):
-            raise serializers.ValidationError("Tài khoản hiện không thể đăng nhập.")
+            record_login_failure(email, ip_address)
+            raise serializers.ValidationError(generic_error)
+        clear_login_failures(email, ip_address)
         attrs["user"] = user
         return attrs
 
