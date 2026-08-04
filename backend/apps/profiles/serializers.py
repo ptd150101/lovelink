@@ -11,6 +11,19 @@ from .models import (
 from .services import age_from_birth_date, presence_for_viewer
 
 
+DEFAULT_FIELD_VISIBILITY = {
+    "income_band": "connections",
+    "hometown_province": "members",
+    "current_province": "members",
+    "education_level": "members",
+    "religion": "members",
+    "smoking_status": "members",
+    "drinking_status": "members",
+    "children_status": "members",
+    "children_plan": "members",
+}
+
+
 class ProvinceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Province
@@ -100,17 +113,7 @@ class ProfileWriteSerializer(serializers.ModelSerializer):
         return value
 
     def validate_field_visibility(self, value):
-        allowed_fields = {
-            "income_band",
-            "hometown_province",
-            "current_province",
-            "education_level",
-            "religion",
-            "smoking_status",
-            "drinking_status",
-            "children_status",
-            "children_plan",
-        }
+        allowed_fields = set(DEFAULT_FIELD_VISIBILITY)
         allowed_rules = {"members", "connections", "private"}
         if not isinstance(value, dict) or any(
             key not in allowed_fields or rule not in allowed_rules
@@ -190,6 +193,14 @@ class MyProfileSerializer(serializers.ModelSerializer):
     def get_age(self, obj):
         return age_from_birth_date(obj.birth_date)
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["field_visibility"] = {
+            **DEFAULT_FIELD_VISIBILITY,
+            **(instance.field_visibility or {}),
+        }
+        return data
+
 
 class PublicProfileSerializer(serializers.ModelSerializer):
     age = serializers.SerializerMethodField()
@@ -254,19 +265,11 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         from apps.connections.services import users_are_connected
 
         connected = users_are_connected(request.user, instance.user)
-        visibility = instance.field_visibility or {}
-        for field in [
-            "income_band",
-            "hometown_province",
-            "current_province",
-            "education_level",
-            "religion",
-            "smoking_status",
-            "drinking_status",
-            "children_status",
-            "children_plan",
-        ]:
-            rule = visibility.get(field, "members")
+        visibility = {
+            **DEFAULT_FIELD_VISIBILITY,
+            **(instance.field_visibility or {}),
+        }
+        for field, rule in visibility.items():
             if rule == "private" or (rule == "connections" and not connected):
                 data[field] = None
         return data
