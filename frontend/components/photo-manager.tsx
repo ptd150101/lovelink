@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Photo } from "@/lib/types";
+import { ImageCropper } from "./image-cropper";
 
 export function PhotoManager({
   photos,
@@ -25,6 +26,7 @@ export function PhotoManager({
   onReorder: (photos: Photo[]) => Promise<void>;
 }) {
   const [dragged, setDragged] = useState<string | null>(null);
+  const [pendingCrop, setPendingCrop] = useState<File | null>(null);
 
   function move(id: string, offset: number) {
     const next = [...photos];
@@ -49,74 +51,86 @@ export function PhotoManager({
   }
 
   return (
-    <div className="photo-manager">
-      {photos.map((photo, index) => (
-        <div
-          key={photo.id}
-          className={photo.is_primary ? "photo-item primary" : "photo-item"}
-          draggable
-          onDragStart={() => setDragged(photo.id)}
-          onDragEnd={() => setDragged(null)}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={() => drop(photo.id)}
-        >
-          <img src={photo.public_url} alt={`Ảnh hồ sơ ${index + 1}`} />
-          <div className="photo-item-label">
-            <GripVertical size={15} />
-            {photo.is_primary ? "Ảnh đại diện" : `Ảnh ${index + 1}`}
-          </div>
-          <div className="photo-item-actions">
-            <button
-              type="button"
-              title="Chuyển sang trái"
-              disabled={index === 0}
-              onClick={() => move(photo.id, -1)}
-            >
-              <MoveLeft size={16} />
-            </button>
-            <button
-              type="button"
-              title="Chuyển sang phải"
-              disabled={index === photos.length - 1}
-              onClick={() => move(photo.id, 1)}
-            >
-              <MoveRight size={16} />
-            </button>
-            {!photo.is_primary && (
+    <>
+      <div className="photo-manager">
+        {photos.map((photo, index) => (
+          <div
+            key={photo.id}
+            className={photo.is_primary ? "photo-item primary" : "photo-item"}
+            draggable
+            onDragStart={() => setDragged(photo.id)}
+            onDragEnd={() => setDragged(null)}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={() => drop(photo.id)}
+          >
+            <img src={photo.public_url} alt={`Ảnh hồ sơ ${index + 1}`} />
+            <div className="photo-item-label">
+              <GripVertical size={15} />
+              {photo.is_primary ? "Ảnh đại diện" : `Ảnh ${index + 1}`}
+            </div>
+            <div className="photo-item-actions">
               <button
                 type="button"
-                title="Đặt làm ảnh đại diện"
-                onClick={() => void onPrimary(photo.id)}
+                title="Chuyển sang trái"
+                disabled={index === 0}
+                onClick={() => move(photo.id, -1)}
               >
-                <Star size={16} />
+                <MoveLeft size={16} />
               </button>
-            )}
-            <button
-              type="button"
-              title="Xóa ảnh"
-              onClick={() => void onRemove(photo)}
-            >
-              <Trash2 size={16} />
-            </button>
+              <button
+                type="button"
+                title="Chuyển sang phải"
+                disabled={index === photos.length - 1}
+                onClick={() => move(photo.id, 1)}
+              >
+                <MoveRight size={16} />
+              </button>
+              {!photo.is_primary && (
+                <button
+                  type="button"
+                  title="Đặt làm ảnh đại diện"
+                  onClick={() => void onPrimary(photo.id)}
+                >
+                  <Star size={16} />
+                </button>
+              )}
+              <button
+                type="button"
+                title="Xóa ảnh"
+                onClick={() => void onRemove(photo)}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
-      {photos.length < 6 && (
-        <label className="upload-box">
-          <input
-            hidden
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void onUpload(file);
-              event.currentTarget.value = "";
-            }}
-          />
-          <ImagePlus />
-          <span>Tải ảnh</span>
-        </label>
+        ))}
+        {photos.length < 6 && (
+          <label className="upload-box">
+            <input
+              hidden
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) setPendingCrop(file);
+                event.currentTarget.value = "";
+              }}
+            />
+            <ImagePlus />
+            <span>Tải và cắt ảnh</span>
+          </label>
+        )}
+      </div>
+      {pendingCrop && (
+        <ImageCropper
+          file={pendingCrop}
+          onCancel={() => setPendingCrop(null)}
+          onConfirm={async (file) => {
+            await onUpload(file);
+            setPendingCrop(null);
+          }}
+        />
       )}
-    </div>
+    </>
   );
 }
