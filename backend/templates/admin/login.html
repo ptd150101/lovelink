@@ -1,0 +1,44 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/login.css' %}">{% endblock %}
+{% block bodyclass %}{{ block.super }} login{% endblock %}
+{% block usertools %}{% endblock %}
+{% block nav-global %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+
+{% block content %}
+{% if form.errors and not form.non_field_errors %}
+<p class="errornote">Vui lòng sửa các lỗi bên dưới.</p>
+{% endif %}
+{% if form.non_field_errors %}
+{% for error in form.non_field_errors %}<p class="errornote">{{ error }}</p>{% endfor %}
+{% endif %}
+
+<div id="content-main">
+  <form action="{{ app_path }}" method="post" id="login-form">{% csrf_token %}
+    <div class="form-row">
+      {{ form.username.errors }}
+      {{ form.username.label_tag }} {{ form.username }}
+    </div>
+    <div class="form-row">
+      {{ form.password.errors }}
+      {{ form.password.label_tag }} {{ form.password }}
+      <input type="hidden" name="next" value="{{ next }}">
+    </div>
+    <div class="form-row">
+      {{ form.otp_code.errors }}
+      {{ form.otp_code.label_tag }} {{ form.otp_code }}
+      <p class="help">Nhập mã từ ứng dụng Authenticator khi tài khoản nhân viên đã bật MFA.</p>
+    </div>
+    {% url 'admin_password_reset' as password_reset_url %}
+    {% if password_reset_url %}
+    <div class="password-reset-link"><a href="{{ password_reset_url }}">{% translate 'Forgotten your password or username?' %}</a></div>
+    {% endif %}
+    <div class="submit-row">
+      <input type="submit" value="{% translate 'Log in' %}">
+    </div>
+  </form>
+</div>
+{% endblock %}
