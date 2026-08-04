@@ -11,7 +11,7 @@ async function login(page: Page, email: string, password: string) {
   await expect(page).toHaveURL(/\/discover/);
 }
 
-test("real backend supports realtime chat and incoming-call recovery", async ({ browser }) => {
+test("real backend supports realtime chat, receipts and incoming-call recovery", async ({ browser }) => {
   const firstContext = await browser.newContext();
   const secondContext = await browser.newContext();
   const first = await firstContext.newPage();
@@ -29,6 +29,7 @@ test("real backend supports realtime chat and incoming-call recovery", async ({ 
   await first.getByPlaceholder("Nhập tin nhắn…").fill(text);
   await first.locator(".composer button").click();
   await expect(second.getByText(text)).toBeVisible({ timeout: 15_000 });
+  await expect(first.getByText("Đã xem").last()).toBeVisible({ timeout: 15_000 });
 
   await first.getByTitle("Gọi video").click();
   await expect(first).toHaveURL(/\/calls\//);
@@ -40,6 +41,18 @@ test("real backend supports realtime chat and incoming-call recovery", async ({ 
 
   await firstContext.close();
   await secondContext.close();
+});
+
+test("member can verify a private phone number through OTP", async ({ page }) => {
+  await login(page, "e2e.a@lovelink.local", "E2EPassword123!");
+  await page.goto("/settings/security");
+  await page.getByLabel("Số điện thoại").fill("0901234567");
+  await page.getByRole("button", { name: /Gửi mã OTP/ }).click();
+  await expect(page.getByText(/Mã OTP đã được gửi/)).toBeVisible();
+  await page.getByLabel("Mã OTP 6 chữ số").fill("123456");
+  await page.getByRole("button", { name: "Xác minh", exact: true }).click();
+  await expect(page.getByText("Xác minh số điện thoại thành công.")).toBeVisible();
+  await expect(page.getByText("Đã xác minh", { exact: true })).toBeVisible();
 });
 
 test("reviewer and moderator workflows are usable in Django admin", async ({ page }) => {
