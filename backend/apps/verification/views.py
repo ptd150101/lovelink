@@ -7,11 +7,12 @@ from rest_framework import generics,status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from common.permissions import IsReviewer
-from common.storage.s3 import head_object,presign_get,presign_put
+from common.storage.s3 import delete_object,head_object,presign_get,presign_put
 from apps.audit.services import audit
 from apps.notifications.models import Notification
 from apps.notifications.services import push_notification
 from apps.profiles.models import Profile
+from apps.profiles.image_processing import InvalidImage, normalize_private_image
 from .models import VerificationRequest,VerificationEvidence,VerificationReview
 from .serializers import VerificationRequestSerializer,StaffVerificationSerializer
 ALLOWED={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"}
@@ -38,9 +39,19 @@ class EvidenceCompleteView(APIView):
  def post(self,request):
   vr=get_object_or_404(VerificationRequest,pk=request.data.get("request_id"),user=request.user,status__in=[VerificationRequest.Status.DRAFT,VerificationRequest.Status.NEEDS_MORE]);key=request.data.get("object_key","");typ=request.data.get("evidence_type")
   if not key.startswith(f"verification/{request.user.pk}/{vr.pk}/") or typ not in VerificationEvidence.Type.values:return Response({"detail":"Dữ liệu không hợp lệ."},status=400)
-  try:meta=head_object(settings.S3_VERIFICATION_BUCKET,key)
-  except Exception:return Response({"detail":"Không tìm thấy file."},status=400)
-  obj,_=VerificationEvidence.objects.update_or_create(request=vr,evidence_type=typ,defaults={"private_object_key":key,"mime_type":meta.get("ContentType",""),"file_size":meta.get("ContentLength",0),"deleted_at":None});return Response({"id":obj.id,"evidence_type":obj.evidence_type},status=201)
+  try:
+   meta=head_object(settings.S3_VERIFICATION_BUCKET,key)
+   if meta.get("ContentLength",0)>10*1024*1024: raise InvalidImage("File quá lớn.")
+   processed=normalize_private_image(settings.S3_VERIFICATION_BUCKET,key)
+  except InvalidImage as exc:return Response({"detail":str(exc)},status=400)
+  except Exception:return Response({"detail":"Không thể xử lý file xác minh."},status=400)
+  previous=VerificationEvidence.objects.filter(request=vr,evidence_type=typ).first()
+  old_key=previous.private_object_key if previous else ""
+  obj,_=VerificationEvidence.objects.update_or_create(request=vr,evidence_type=typ,defaults={"private_object_key":processed["object_key"],"mime_type":processed["mime_type"],"file_size":processed["file_size"],"deleted_at":None})
+  if old_key and old_key!=obj.private_object_key:
+   try:delete_object(settings.S3_VERIFICATION_BUCKET,old_key)
+   except Exception:pass
+  return Response({"id":obj.id,"evidence_type":obj.evidence_type},status=201)
 
 class VerificationSubmitView(APIView):
  def post(self,request,pk):
@@ -64,7 +75,16 @@ class StaffVerificationActionView(APIView):
   action=request.data.get("action");allowed={"start":VerificationRequest.Status.IN_REVIEW,"request_more":VerificationRequest.Status.NEEDS_MORE,"approve":VerificationRequest.Status.VERIFIED,"reject":VerificationRequest.Status.REJECTED,"revoke":VerificationRequest.Status.REVOKED}
   if action not in allowed:return Response({"detail":"Hành động không hợp lệ."},status=400)
   with transaction.atomic():
-   vr=get_object_or_404(VerificationRequest.objects.select_for_update().select_related("user__profile"),pk=pk);before=vr.status;new=allowed[action];reason=str(request.data.get("reason_code",""));visible=str(request.data.get("user_visible_reason",""));note=str(request.data.get("internal_note",""))
+   vr=get_object_or_404(VerificationRequest.objects.select_for_update().select_related("user__profile"),pk=pk);before=vr.status;new=allowed[action];reason=str(request.data.get("reason_code","")).strip();visible=str(request.data.get("user_visible_reason","")).strip();note=str(request.data.get("internal_note","")).strip()
+   transitions={
+    "start":{VerificationRequest.Status.SUBMITTED,VerificationRequest.Status.IN_REVIEW},
+    "request_more":{VerificationRequest.Status.SUBMITTED,VerificationRequest.Status.IN_REVIEW},
+    "approve":{VerificationRequest.Status.SUBMITTED,VerificationRequest.Status.IN_REVIEW},
+    "reject":{VerificationRequest.Status.SUBMITTED,VerificationRequest.Status.IN_REVIEW},
+    "revoke":{VerificationRequest.Status.VERIFIED},
+   }
+   if before not in transitions[action]:return Response({"detail":"Trạng thái hiện tại không cho phép hành động này."},status=409)
+   if action in {"request_more","reject","revoke"} and (not reason or not visible):return Response({"detail":"Cần nhập lý do và nội dung phản hồi cho người dùng."},status=400)
    vr.status=new;vr.assigned_reviewer=request.user;vr.internal_note=note;vr.decision_reason_code=reason;vr.user_visible_reason=visible
    if action=="start":vr.review_started_at=timezone.now()
    if action in {"approve","reject","revoke"}:vr.decided_at=timezone.now()

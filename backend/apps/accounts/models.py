@@ -46,3 +46,12 @@ class UserSession(models.Model):
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     last_seen_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+class UserPreference(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="preferences")
+    email_connection_notifications = models.BooleanField(default=True)
+    email_message_notifications = models.BooleanField(default=False)
+    email_verification_notifications = models.BooleanField(default=True)
+    in_app_notifications = models.BooleanField(default=True)
+    show_online_status = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)

@@ -1,7 +1,7 @@
 from datetime import date
 from django.contrib.auth import authenticate, password_validation
 from rest_framework import serializers
-from .models import User
+from .models import User, UserPreference
 
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -47,3 +47,19 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model=User
         fields=("id","email","phone","status","is_email_verified","is_phone_verified","created_at")
+
+
+class UserPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserPreference
+        exclude = ("user",)
+
+class EmailChangeSerializer(serializers.Serializer):
+    new_email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    def validate_new_email(self, value):
+        value = value.lower().strip()
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Không thể sử dụng email này.")
+        return value

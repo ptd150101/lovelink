@@ -9,7 +9,7 @@ class OccupationCategorySerializer(serializers.ModelSerializer):
 class InterestSerializer(serializers.ModelSerializer):
     class Meta: model=Interest; fields=("id","name")
 class ProfilePhotoSerializer(serializers.ModelSerializer):
-    class Meta: model=ProfilePhoto; fields=("id","public_url","position","is_primary","width","height","mime_type")
+    class Meta: model=ProfilePhoto; fields=("id","public_url","thumbnail_url","position","is_primary","width","height","mime_type")
 
 class ProfileWriteSerializer(serializers.ModelSerializer):
     interest_ids=serializers.PrimaryKeyRelatedField(source="interests",queryset=Interest.objects.filter(is_active=True),many=True,required=False)
@@ -23,6 +23,15 @@ class ProfileWriteSerializer(serializers.ModelSerializer):
         valid={x[0] for x in Profile.Gender.choices}
         if not isinstance(value,list) or not value or any(x not in valid for x in value): raise serializers.ValidationError("Lựa chọn giới tính không hợp lệ.")
         return list(dict.fromkeys(value))
+    def validate_interest_ids(self,value):
+        if len(value)>10: raise serializers.ValidationError("Chỉ được chọn tối đa 10 sở thích.")
+        return value
+    def validate_field_visibility(self,value):
+        allowed_fields={"income_band","hometown_province","current_province","education_level","religion","smoking_status","drinking_status","children_status","children_plan"}
+        allowed_rules={"members","connections","private"}
+        if not isinstance(value,dict) or any(k not in allowed_fields or v not in allowed_rules for k,v in value.items()):
+            raise serializers.ValidationError("Cấu hình quyền riêng tư không hợp lệ.")
+        return value
     def update(self,instance,validated):
         interests=validated.pop("interests",None)
         sensitive_changed=any(k in validated and getattr(instance,k)!=v for k,v in validated.items() if k in {"display_name","birth_date","gender"})

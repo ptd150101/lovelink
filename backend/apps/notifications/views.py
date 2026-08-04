@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,7 +12,7 @@ class NotificationListView(generics.ListAPIView):
 
 class NotificationReadView(APIView):
     def post(self, request, pk):
-        n = Notification.objects.get(pk=pk, user=request.user)
+        n = get_object_or_404(Notification, pk=pk, user=request.user)
         if not n.read_at:
             n.read_at = timezone.now(); n.save(update_fields=["read_at"])
         return Response(NotificationSerializer(n).data)

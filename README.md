@@ -18,7 +18,7 @@ LoveLink is a full-stack dating-platform MVP focused on verified profiles, struc
 - Account privacy settings, hide profile, blocked-user management and delayed account deletion
 - Django admin and reviewer/moderator APIs
 - Docker Compose, MinIO, PostgreSQL, Redis, Celery and LiveKit OSS
-- Backend tests and Playwright E2E skeletons
+- Backend unit/integration tests and Playwright browser smoke tests
 
 ## Architecture
 
@@ -49,11 +49,17 @@ Create an admin account:
 docker compose exec backend python manage.py createsuperuser
 ```
 
-Create database migrations after model changes:
+Apply committed database migrations:
 
 ```bash
-docker compose exec backend python manage.py makemigrations
 docker compose exec backend python manage.py migrate
+```
+
+Run the test suites:
+
+```bash
+docker compose exec backend pytest
+cd frontend && npm ci && npm run lint && npm run build && npm run test:e2e
 ```
 
 ## Security notes

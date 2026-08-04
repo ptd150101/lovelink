@@ -45,3 +45,15 @@ def delete_object(bucket: str, object_key: str) -> None:
 
 def head_object(bucket: str, object_key: str) -> dict:
     return client().head_object(Bucket=bucket, Key=object_key)
+
+
+def get_object_bytes(bucket: str, object_key: str) -> tuple[bytes, dict]:
+    response = client().get_object(Bucket=bucket, Key=object_key)
+    return response["Body"].read(), response
+
+
+def put_object_bytes(bucket: str, object_key: str, data: bytes, content_type: str, *, public: bool = False) -> None:
+    kwargs = {"Bucket": bucket, "Key": object_key, "Body": data, "ContentType": content_type}
+    if public:
+        kwargs["CacheControl"] = "public, max-age=31536000, immutable"
+    client().put_object(**kwargs)

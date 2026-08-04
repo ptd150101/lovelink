@@ -14,8 +14,8 @@ from common.permissions import IsActiveAuthenticated
 from common.throttles import AuthRateThrottle
 from apps.audit.services import audit
 from .emails import send_password_reset_email, send_verification_email
-from .models import User, UserSession
-from .serializers import LoginSerializer, PasswordResetConfirmSerializer, RegisterSerializer, UserSerializer
+from .models import User, UserSession, UserPreference
+from .serializers import LoginSerializer, PasswordResetConfirmSerializer, RegisterSerializer, UserSerializer, UserPreferenceSerializer, EmailChangeSerializer
 from .tokens import load_email_token, load_password_token
 
 
@@ -119,7 +119,8 @@ class SessionListView(APIView):
 
 class SessionDeleteView(APIView):
     def delete(self,request,pk):
-        tracked=UserSession.objects.get(pk=pk,user=request.user)
+        from django.shortcuts import get_object_or_404
+        tracked=get_object_or_404(UserSession,pk=pk,user=request.user)
         Session.objects.filter(session_key=tracked.session_key).delete(); tracked.delete()
         return Response(status=204)
 
@@ -135,3 +136,32 @@ class DeletionRequestView(APIView):
         if user.status != User.Status.SCHEDULED_DELETION: return Response({"detail":"Không có yêu cầu xóa."},status=400)
         user.status=User.Status.ACTIVE; user.scheduled_deletion_at=None; user.save(update_fields=["status","scheduled_deletion_at","updated_at"])
         return Response(status=204)
+
+
+class UserPreferenceView(APIView):
+    def get(self, request):
+        obj, _ = UserPreference.objects.get_or_create(user=request.user)
+        return Response(UserPreferenceSerializer(obj).data)
+
+    def patch(self, request):
+        obj, _ = UserPreference.objects.get_or_create(user=request.user)
+        serializer = UserPreferenceSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        audit(actor=request.user, action="account.preferences_updated", target=obj)
+        return Response(serializer.data)
+
+class EmailChangeView(APIView):
+    def post(self, request):
+        serializer = EmailChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not request.user.check_password(serializer.validated_data["password"]):
+            return Response({"password": ["Mật khẩu không đúng."]}, status=400)
+        request.user.email = serializer.validated_data["new_email"]
+        request.user.is_email_verified = False
+        request.user.status = User.Status.PENDING
+        request.user.save(update_fields=["email", "is_email_verified", "status", "updated_at"])
+        send_verification_email(request.user)
+        audit(actor=request.user, action="account.email_changed", target=request.user)
+        logout(request)
+        return Response({"detail": "Email đã được thay đổi. Hãy xác minh email mới để đăng nhập lại."})

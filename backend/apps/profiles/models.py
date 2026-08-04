@@ -93,6 +93,8 @@ class ProfilePhoto(models.Model):
     profile=models.ForeignKey(Profile,on_delete=models.CASCADE,related_name="photos")
     object_key=models.CharField(max_length=500,unique=True)
     public_url=models.URLField(max_length=1000)
+    thumbnail_object_key=models.CharField(max_length=500,blank=True)
+    thumbnail_url=models.URLField(max_length=1000,blank=True)
     position=models.PositiveSmallIntegerField(default=0)
     is_primary=models.BooleanField(default=False)
     moderation_status=models.CharField(max_length=16,choices=Moderation.choices,default=Moderation.APPROVED)

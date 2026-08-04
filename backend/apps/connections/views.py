@@ -34,7 +34,9 @@ class ConnectionCreateView(APIView):
         audit(actor=request.user,action="connection.requested",target=obj)
         return Response(ConnectionRequestSerializer(obj).data,status=201)
 
-class BaseConnectionList(generics.ListAPIView):serializer_class=ConnectionRequestSerializer
+class BaseConnectionList(generics.ListAPIView):
+    serializer_class=ConnectionRequestSerializer
+    pagination_ordering="-sent_at"
 class ReceivedListView(BaseConnectionList):
     def get_queryset(self):return ConnectionRequest.objects.filter(receiver=self.request.user).select_related("sender__profile","receiver__profile")
 class SentListView(BaseConnectionList):

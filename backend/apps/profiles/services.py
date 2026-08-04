@@ -27,3 +27,10 @@ def publish(profile):
     profile.completion_percent=profile_completion(profile); profile.visibility_status=Profile.Visibility.PUBLISHED
     profile.published_at=profile.published_at or timezone.now(); profile.save(update_fields=["completion_percent","visibility_status","published_at","updated_at"])
     return {}
+
+
+def require_verification_recheck(profile):
+    if profile.verification_level == Profile.VerificationLevel.IDENTITY:
+        profile.verification_level = Profile.VerificationLevel.RECHECK
+        profile.verified_at = None
+        profile.save(update_fields=["verification_level", "verified_at", "updated_at"])
