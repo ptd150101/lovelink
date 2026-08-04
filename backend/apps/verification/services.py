@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from django.db import transaction
 from django.utils import timezone
 
@@ -13,10 +11,11 @@ from apps.profiles.models import Profile
 from .models import VerificationEvidence, VerificationRequest, VerificationReview
 
 
-@dataclass(frozen=True)
 class VerificationActionError(Exception):
-    message: str
-    conflict: bool = False
+    def __init__(self, message: str, conflict: bool = False):
+        super().__init__(message)
+        self.message = message
+        self.conflict = conflict
 
     def __str__(self) -> str:
         return self.message
