@@ -1,7 +1,7 @@
 import uuid
 
 import pytest
-from django.contrib import mail
+from django.core import mail
 from django.urls import reverse
 from django.utils import timezone
 
