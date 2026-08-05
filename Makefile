@@ -12,17 +12,17 @@ logs:
 	docker compose logs -f
 
 migrate:
-	docker compose exec backend uv run --active --no-sync python manage.py migrate
+	docker compose exec backend uv run --frozen python manage.py migrate
 
 makemigrations:
-	docker compose exec backend uv run --active --no-sync python manage.py makemigrations
+	docker compose exec backend uv run --frozen python manage.py makemigrations
 
 superuser:
-	docker compose exec backend uv run --active --no-sync python manage.py createsuperuser
+	docker compose exec backend uv run --frozen python manage.py createsuperuser
 
 test:
-	docker compose exec backend uv run --active --no-sync pytest
+	docker compose exec backend uv run --frozen pytest
 
 lint:
-	docker compose exec backend uv run --active --no-sync ruff check .
+	docker compose exec backend uv run --frozen ruff check .
 	docker compose exec frontend npm run lint

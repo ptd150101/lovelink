@@ -50,15 +50,15 @@ Then open:
 - Django admin: http://localhost:8000/admin
 - MinIO console: http://localhost:9001
 
-The backend Docker image uses uv to create and populate its isolated Python environment. No host Python or uv installation is required for Docker Compose. For native backend development, install uv and follow [`docs/local-development.md`](docs/local-development.md).
+The backend is an uv project requiring Python `>=3.13,<3.14`. Dependencies are declared in `backend/pyproject.toml` and pinned by `backend/uv.lock`. No host Python or uv installation is required for Docker Compose. For native backend development, install uv and follow [`docs/local-development.md`](docs/local-development.md); the first `uv run` automatically obtains Python when needed, creates `.venv` and synchronizes dependencies.
 
 For local phone verification, `SMS_BACKEND=console` writes the OTP to backend logs. A deterministic `PHONE_OTP_FIXED_CODE` may be used only in local development or E2E testing and must remain empty in production.
 
 Create an admin account and enroll its authenticator:
 
 ```bash
-docker compose exec backend uv run --active --no-sync python manage.py createsuperuser
-docker compose exec backend uv run --active --no-sync python manage.py enroll_staff_mfa admin@example.com
+docker compose exec backend uv run python manage.py createsuperuser
+docker compose exec backend uv run python manage.py enroll_staff_mfa admin@example.com
 ```
 
 After all staff accounts are enrolled, production may enforce MFA globally with `STAFF_MFA_REQUIRED=true`.
@@ -66,31 +66,28 @@ After all staff accounts are enrolled, production may enforce MFA globally with 
 Apply committed database migrations:
 
 ```bash
-docker compose exec backend uv run --active --no-sync python manage.py migrate
+docker compose exec backend uv run python manage.py migrate
 ```
 
 Run the standard test suites:
 
 ```bash
-docker compose exec backend uv run --active --no-sync pytest
+docker compose exec backend uv run pytest
 cd frontend && npm ci && npm run lint && npm run build && npm run test:e2e
 ```
 
-Run backend tests natively through the uv-managed environment:
+Run backend tests natively through the uv-managed project environment:
 
 ```bash
 cd backend
-uv python install 3.13
-uv venv --python 3.13
-uv pip install -r requirements.txt
-uv run --no-sync pytest
+uv run pytest
 ```
 
 Run the deterministic full-stack browser flow locally:
 
 ```bash
 # Add PHONE_OTP_FIXED_CODE=123456 to the local .env used only for this test.
-docker compose exec backend uv run --active --no-sync python manage.py seed_e2e
+docker compose exec backend uv run python manage.py seed_e2e
 cd frontend
 FULLSTACK_E2E=1 PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e -- --project=chromium e2e/fullstack.spec.ts
 ```
