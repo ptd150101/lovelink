@@ -11,7 +11,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The backend image copies the pinned uv binary, creates `/opt/venv`, synchronizes `backend/requirements.txt` into that environment and adds its executables to `PATH`. Docker BuildKit caches uv downloads between builds.
+The backend image copies the pinned uv binary, creates `/opt/venv`, installs `backend/requirements.txt` into that environment and adds its executables to `PATH`. Docker BuildKit caches uv downloads between builds.
 
 ## Native backend setup
 
@@ -29,7 +29,7 @@ From the repository root:
 cd backend
 uv python install 3.13
 uv venv --python 3.13
-uv pip sync requirements.txt
+uv pip install -r requirements.txt
 ```
 
 The environment is created at `backend/.venv`. Activation is optional because commands can run through uv directly:
@@ -56,10 +56,10 @@ uv run --no-sync pytest
 uv run --no-sync ruff check .
 ```
 
-After changing `requirements.txt`, synchronize the existing environment again:
+After changing `requirements.txt`, install the updated dependency set into the existing environment again:
 
 ```bash
-uv pip sync requirements.txt
+uv pip install -r requirements.txt
 ```
 
-`uv pip sync` removes packages that are not declared in the requirements file, keeping local and CI environments aligned.
+The project currently keeps `requirements.txt` as the canonical dependency declaration, while uv replaces `virtualenv` and `pip` for environment creation and package installation.
