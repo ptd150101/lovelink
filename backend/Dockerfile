@@ -15,8 +15,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libpq5 libjpeg62-turbo zlib1g && rm -rf /var/lib/apt/lists/*
 
 COPY --from=uv /uv /uvx /bin/
-COPY pyproject.toml ./
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-install-project
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-install-project
 
 COPY . .
 EXPOSE 8000
