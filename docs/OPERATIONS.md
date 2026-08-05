@@ -68,13 +68,13 @@ LoveLink includes TOTP MFA for Django Admin accounts. TOTP secrets are encrypted
 Enroll each staff account individually:
 
 ```bash
-docker compose exec backend python manage.py enroll_staff_mfa reviewer@example.com
+docker compose exec backend uv run --active --no-sync python manage.py enroll_staff_mfa reviewer@example.com
 ```
 
 The command prints an `otpauth://` URI once. Add it to Google Authenticator, Microsoft Authenticator, 1Password or another standards-compatible TOTP application. To replace a lost device:
 
 ```bash
-docker compose exec backend python manage.py enroll_staff_mfa reviewer@example.com --replace
+docker compose exec backend uv run --active --no-sync python manage.py enroll_staff_mfa reviewer@example.com --replace
 ```
 
 After every reviewer, moderator and superuser is enrolled:
