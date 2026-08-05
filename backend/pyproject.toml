@@ -1,3 +1,39 @@
+[project]
+name = "lovelink-backend"
+version = "0.1.0"
+description = "Django backend for the LoveLink MVP"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "Django==6.0.6",
+  "djangorestframework>=3.16,<3.17",
+  "django-filter>=25.1,<26",
+  "django-cors-headers>=4.7,<5",
+  "channels>=4.2,<5",
+  "channels-redis>=4.2,<5",
+  "daphne>=4.1,<5",
+  "whitenoise>=6.8,<7",
+  "celery[redis]>=5.5,<6",
+  "psycopg[binary]>=3.2,<4",
+  "boto3>=1.38,<2",
+  "Pillow>=11.2,<12",
+  "livekit-api>=1.0,<2",
+  "argon2-cffi>=23.1,<26",
+  "cryptography>=45,<51",
+  "sentry-sdk[django]>=2.30,<3",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-django>=4.11,<5",
+  "pytest-asyncio>=0.26,<1",
+  "factory-boy>=3.3,<4",
+  "ruff>=0.11,<1",
+]
+
+[tool.uv]
+package = false
+
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py", "*_tests.py"]
