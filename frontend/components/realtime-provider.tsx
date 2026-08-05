@@ -80,6 +80,16 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         setIncomingCall((current) =>
           current && (!payload?.id || current.id === payload.id) ? null : current,
         );
+        if (
+          payload?.id &&
+          window.location.pathname === `/calls/${payload.id}`
+        ) {
+          // A participant ending the call must remove the other participant from
+          // the media room immediately. A document-level replacement is used here
+          // so this remains reliable even while LiveKit is disconnecting tracks.
+          window.location.replace("/messages");
+          return;
+        }
       }
       if (type === "account.suspended") {
         setIncomingCall(null);
