@@ -57,8 +57,8 @@ For local phone verification, `SMS_BACKEND=console` writes the OTP to backend lo
 Create an admin account and enroll its authenticator:
 
 ```bash
-docker compose exec backend python manage.py createsuperuser
-docker compose exec backend python manage.py enroll_staff_mfa admin@example.com
+docker compose exec backend uv run --active --no-sync python manage.py createsuperuser
+docker compose exec backend uv run --active --no-sync python manage.py enroll_staff_mfa admin@example.com
 ```
 
 After all staff accounts are enrolled, production may enforce MFA globally with `STAFF_MFA_REQUIRED=true`.
@@ -66,13 +66,13 @@ After all staff accounts are enrolled, production may enforce MFA globally with 
 Apply committed database migrations:
 
 ```bash
-docker compose exec backend python manage.py migrate
+docker compose exec backend uv run --active --no-sync python manage.py migrate
 ```
 
 Run the standard test suites:
 
 ```bash
-docker compose exec backend pytest
+docker compose exec backend uv run --active --no-sync pytest
 cd frontend && npm ci && npm run lint && npm run build && npm run test:e2e
 ```
 
@@ -90,7 +90,7 @@ Run the deterministic full-stack browser flow locally:
 
 ```bash
 # Add PHONE_OTP_FIXED_CODE=123456 to the local .env used only for this test.
-docker compose exec backend python manage.py seed_e2e
+docker compose exec backend uv run --active --no-sync python manage.py seed_e2e
 cd frontend
 FULLSTACK_E2E=1 PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e -- --project=chromium e2e/fullstack.spec.ts
 ```
