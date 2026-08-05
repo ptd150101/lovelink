@@ -18,7 +18,7 @@ COPY --from=uv /uv /uvx /bin/
 RUN uv venv /opt/venv
 
 COPY requirements.txt ./
-RUN --mount=type=cache,target=/root/.cache/uv uv pip sync --python /opt/venv/bin/python requirements.txt
+RUN --mount=type=cache,target=/root/.cache/uv uv pip install --python /opt/venv/bin/python -r requirements.txt
 
 COPY . .
 EXPOSE 8000
