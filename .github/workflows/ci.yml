@@ -120,7 +120,7 @@ jobs:
           docker compose logs --no-color backend frontend minio livekit
           exit 1
       - name: Seed deterministic E2E users and workflows
-        run: docker compose exec -T backend python manage.py seed_e2e
+        run: docker compose exec -T backend uv run --active --no-sync python manage.py seed_e2e
       - name: Verify PostgreSQL backup and restore
         run: |
           docker compose exec -T postgres pg_dump -U lovelink -d lovelink -Fc > /tmp/lovelink.dump
