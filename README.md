@@ -50,6 +50,8 @@ Then open:
 - Django admin: http://localhost:8000/admin
 - MinIO console: http://localhost:9001
 
+The backend Docker image uses uv to create and populate its isolated Python environment. No host Python or uv installation is required for Docker Compose. For native backend development, install uv and follow [`docs/local-development.md`](docs/local-development.md).
+
 For local phone verification, `SMS_BACKEND=console` writes the OTP to backend logs. A deterministic `PHONE_OTP_FIXED_CODE` may be used only in local development or E2E testing and must remain empty in production.
 
 Create an admin account and enroll its authenticator:
@@ -72,6 +74,16 @@ Run the standard test suites:
 ```bash
 docker compose exec backend pytest
 cd frontend && npm ci && npm run lint && npm run build && npm run test:e2e
+```
+
+Run backend tests natively through the uv-managed environment:
+
+```bash
+cd backend
+uv python install 3.13
+uv venv --python 3.13
+uv pip sync requirements.txt
+uv run --no-sync pytest
 ```
 
 Run the deterministic full-stack browser flow locally:
