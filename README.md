@@ -82,7 +82,7 @@ Run backend tests natively through the uv-managed environment:
 cd backend
 uv python install 3.13
 uv venv --python 3.13
-uv pip sync requirements.txt
+uv pip install -r requirements.txt
 uv run --no-sync pytest
 ```
 
