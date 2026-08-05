@@ -56,10 +56,10 @@ services:
     build: ./backend
     env_file: .env
     command: >
-      sh -c "uv run --active --no-sync python manage.py migrate --noinput &&
-      uv run --active --no-sync python manage.py seed_reference_data &&
-      uv run --active --no-sync python manage.py collectstatic --noinput &&
-      exec uv run --active --no-sync daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+      sh -c "uv run python manage.py migrate --noinput &&
+      uv run python manage.py seed_reference_data &&
+      uv run python manage.py collectstatic --noinput &&
+      exec uv run daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     volumes:
       - ./backend:/app
     ports:
@@ -75,7 +75,7 @@ services:
   celery:
     build: ./backend
     env_file: .env
-    command: uv run --active --no-sync celery -A config worker -l INFO
+    command: uv run celery -A config worker -l INFO
     volumes:
       - ./backend:/app
     depends_on:
@@ -87,7 +87,7 @@ services:
   celery-beat:
     build: ./backend
     env_file: .env
-    command: uv run --active --no-sync celery -A config beat -l INFO
+    command: uv run celery -A config beat -l INFO
     volumes:
       - ./backend:/app
     depends_on:
