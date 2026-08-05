@@ -1,6 +1,6 @@
 # Local development
 
-Docker builds and native Python development use [uv](https://docs.astral.sh/uv/) for Python installation, virtual-environment management and dependency installation.
+Docker builds and native Python development use [uv](https://docs.astral.sh/uv/) in project mode. The backend declares Python `>=3.13,<3.14` and all dependencies in `backend/pyproject.toml`; `backend/uv.lock` pins the resolved environment.
 
 ## Full stack in Docker Compose
 
@@ -11,7 +11,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The backend image copies the pinned uv binary, creates `/opt/venv`, installs `backend/requirements.txt` into that environment and adds its executables to `PATH`. Docker BuildKit caches uv downloads between builds.
+The backend image copies the pinned uv binary and installs the locked project environment into `/opt/venv`. Docker BuildKit caches uv downloads between builds.
 
 ## Infrastructure in Docker, frontend and backend on the host
 
@@ -40,33 +40,31 @@ The Compose file publishes these local endpoints:
 
 PostgreSQL and Redis are bound to `127.0.0.1`, so they are available to host processes without being exposed to the local network. If either default port is already occupied, change `POSTGRES_EXPOSE_PORT` or `REDIS_EXPOSE_PORT` in `.env` and set the corresponding `POSTGRES_PORT` or `REDIS_URL` value in `.env.host`.
 
-Install the backend environment once:
+Install uv once on Windows:
+
+```powershell
+winget install --id=astral-sh.uv -e
+```
+
+Then run Django directly. There is no separate `uv python install`, `uv venv` or dependency-install command: the first `uv run` selects a compatible Python 3.13 interpreter, downloads it when needed, creates `backend/.venv` and synchronizes the locked dependencies automatically.
 
 ```powershell
 cd backend
-uv python install 3.13
-uv venv --python 3.13
-uv pip install -r requirements.txt
-```
-
-Prepare and start Django:
-
-```powershell
-uv run --env-file ../.env.host --no-sync python manage.py migrate
-uv run --env-file ../.env.host --no-sync python manage.py seed_reference_data
-uv run --env-file ../.env.host --no-sync python manage.py runserver 0.0.0.0:8000
+uv run --env-file ../.env.host python manage.py migrate
+uv run --env-file ../.env.host python manage.py seed_reference_data
+uv run --env-file ../.env.host python manage.py runserver 0.0.0.0:8000
 ```
 
 Run Celery in separate terminals when background jobs are needed:
 
 ```powershell
 cd backend
-uv run --env-file ../.env.host --no-sync celery -A config worker -l INFO
+uv run --env-file ../.env.host celery -A config worker -l INFO
 ```
 
 ```powershell
 cd backend
-uv run --env-file ../.env.host --no-sync celery -A config beat -l INFO
+uv run --env-file ../.env.host celery -A config beat -l INFO
 ```
 
 Create `frontend/.env.local`:
@@ -97,53 +95,29 @@ To stop and remove their containers while keeping named volumes:
 docker compose down
 ```
 
-## Native backend setup
+## Native backend commands
 
-Install uv on Windows with WinGet:
-
-```powershell
-winget install --id=astral-sh.uv -e
-```
-
-On macOS or Linux, install uv with the official standalone installer or an operating-system package manager.
-
-From the repository root:
+On macOS or Linux, install uv with the official standalone installer or an operating-system package manager. From `backend/`, commands run through the project environment automatically:
 
 ```bash
-cd backend
-uv python install 3.13
-uv venv --python 3.13
-uv pip install -r requirements.txt
+uv run python manage.py check
+uv run python manage.py makemigrations --check --dry-run
+uv run pytest
+uv run ruff check .
 ```
 
-The environment is created at `backend/.venv`. Activation is optional because commands can run through uv directly:
+An explicit synchronization step is optional and useful in CI or before working offline:
 
 ```bash
-uv run --no-sync python manage.py migrate
-uv run --no-sync python manage.py seed_reference_data
-uv run --no-sync python manage.py runserver
+uv sync --frozen
 ```
 
-Run background workers in separate terminals:
+Manage dependencies through project commands rather than `uv pip install`:
 
 ```bash
-uv run --no-sync celery -A config worker -l INFO
-uv run --no-sync celery -A config beat -l INFO
+uv add package-name
+uv add --dev package-name
+uv remove package-name
 ```
 
-Run backend validation:
-
-```bash
-uv run --no-sync python manage.py check
-uv run --no-sync python manage.py makemigrations --check --dry-run
-uv run --no-sync pytest
-uv run --no-sync ruff check .
-```
-
-After changing `requirements.txt`, install the updated dependency set into the existing environment again:
-
-```bash
-uv pip install -r requirements.txt
-```
-
-The project currently keeps `requirements.txt` as the canonical dependency declaration, while uv replaces `virtualenv` and `pip` for environment creation and package installation.
+These commands update `pyproject.toml` and `uv.lock`. Commit both files whenever dependencies change.
