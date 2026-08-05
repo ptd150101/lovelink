@@ -17,23 +17,28 @@ jobs:
         with:
           version: "0.12.1"
           enable-cache: true
-          cache-dependency-glob: backend/requirements.txt
-      - name: Create backend environment with uv
+          cache-dependency-glob: |
+            backend/pyproject.toml
+            backend/uv.lock
+      - name: Sync backend environment with uv
         working-directory: backend
-        run: |
-          uv python install 3.13
-          uv venv --python 3.13
-          uv pip install -r requirements.txt
+        run: uv sync
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-uv-lock
+          path: backend/uv.lock
+          if-no-files-found: error
       - name: Run backend checks and tests
         working-directory: backend
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
         run: |
-          uv run --no-sync python manage.py check
-          uv run --no-sync python manage.py makemigrations --check --dry-run
-          uv run --no-sync python manage.py migrate --noinput
-          uv run --no-sync pytest
-          uv run --no-sync python -m compileall -q .
+          uv run --frozen python manage.py check
+          uv run --frozen python manage.py makemigrations --check --dry-run
+          uv run --frozen python manage.py migrate --noinput
+          uv run --frozen pytest
+          uv run --frozen python -m compileall -q .
 
   frontend:
     runs-on: ubuntu-latest
@@ -120,7 +125,7 @@ jobs:
           docker compose logs --no-color backend frontend minio livekit
           exit 1
       - name: Seed deterministic E2E users and workflows
-        run: docker compose exec -T backend uv run --active --no-sync python manage.py seed_e2e
+        run: docker compose exec -T backend uv run python manage.py seed_e2e
       - name: Verify PostgreSQL backup and restore
         run: |
           docker compose exec -T postgres pg_dump -U lovelink -d lovelink -Fc > /tmp/lovelink.dump
