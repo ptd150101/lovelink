@@ -6,4 +6,7 @@ class CursorPagination(DRFCursorPagination):
     cursor_query_param = "cursor"
 
     def get_ordering(self, request, queryset, view):
-        return getattr(view, "pagination_ordering", super().get_ordering(request, queryset, view))
+        ordering = getattr(view, "pagination_ordering", None)
+        if ordering is None:
+            return super().get_ordering(request, queryset, view)
+        return (ordering,) if isinstance(ordering, str) else ordering

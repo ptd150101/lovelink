@@ -113,6 +113,9 @@ class Command(BaseCommand):
         admin.is_superuser = True
         admin.set_password("E2EAdminPassword123!")
         admin.save()
+        Profile.objects.get_or_create(
+            user=admin, defaults={"birth_date": date(1995, 1, 1)}
+        )
 
         self.stdout.write(
             self.style.SUCCESS(

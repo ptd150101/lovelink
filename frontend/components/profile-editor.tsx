@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, uploadToSignedUrl } from "@/lib/api";
 import type { Photo, Profile } from "@/lib/types";
-import { Button, Card } from "./ui";
+import { Alert, Button, Card } from "./ui";
 import { PhotoManager } from "./photo-manager";
 import {
   BasicProfileFields,
@@ -261,7 +261,7 @@ export function ProfileEditor({
         </>
       )}
 
-      {error && <div className="alert error-box">{error}</div>}
+      {error && <Alert>{error}</Alert>}
       <div className="form-actions">
         {index > 0 && !edit && (
           <Button

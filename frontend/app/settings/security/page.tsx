@@ -5,7 +5,7 @@ import { BadgeCheck, Phone } from "lucide-react";
 import { SettingsNav } from "@/components/settings-nav";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
-import { Button, Card, Field, Input } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, Status } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 
 export default function Security() {
@@ -16,10 +16,12 @@ export default function Security() {
   });
   const [sessions, setSessions] = useState<any[]>([]);
   const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordTone, setPasswordTone] = useState<"status" | "error">("status");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [phoneMessage, setPhoneMessage] = useState("");
+  const [phoneTone, setPhoneTone] = useState<"status" | "error">("status");
   const [phoneBusy, setPhoneBusy] = useState(false);
 
   async function loadSessions() {
@@ -41,9 +43,11 @@ export default function Security() {
         method: "POST",
         body: JSON.stringify(passwordData),
       });
+      setPasswordTone("status");
       setPasswordMessage("Đã đổi mật khẩu.");
       setPasswordData({ current_password: "", new_password: "" });
     } catch (caught: any) {
+      setPasswordTone("error");
       setPasswordMessage(caught.message);
     }
   }
@@ -56,6 +60,7 @@ export default function Security() {
         method: "POST",
         body: JSON.stringify({ phone }),
       });
+      setPhoneTone("status");
       setOtpSent(true);
       setCode("");
       setPhoneMessage(
@@ -64,6 +69,7 @@ export default function Security() {
         )} phút.`,
       );
     } catch (caught: any) {
+      setPhoneTone("error");
       setPhoneMessage(caught.message);
     } finally {
       setPhoneBusy(false);
@@ -82,8 +88,10 @@ export default function Security() {
       await refresh();
       setOtpSent(false);
       setCode("");
+      setPhoneTone("status");
       setPhoneMessage("Xác minh số điện thoại thành công.");
     } catch (caught: any) {
+      setPhoneTone("error");
       setPhoneMessage(caught.message);
     } finally {
       setPhoneBusy(false);
@@ -156,7 +164,12 @@ export default function Security() {
               </Button>
             </div>
           )}
-          {phoneMessage && <p>{phoneMessage}</p>}
+          {phoneMessage &&
+            (phoneTone === "error" ? (
+              <Alert>{phoneMessage}</Alert>
+            ) : (
+              <Status>{phoneMessage}</Status>
+            ))}
         </form>
       </Card>
 
@@ -189,7 +202,12 @@ export default function Security() {
             />
           </Field>
           <Button>Đổi mật khẩu</Button>
-          {passwordMessage && <p>{passwordMessage}</p>}
+          {passwordMessage &&
+            (passwordTone === "error" ? (
+              <Alert>{passwordMessage}</Alert>
+            ) : (
+              <Status>{passwordMessage}</Status>
+            ))}
         </form>
       </Card>
 

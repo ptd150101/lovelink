@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BadgeCheck, Flag, Send, UserX, Video } from "lucide-react";
 import { api } from "@/lib/api";
@@ -11,7 +11,8 @@ import type {
   Presence,
 } from "@/lib/types";
 import { useRealtime } from "./realtime-provider";
-import { Button, Textarea } from "./ui";
+import { Alert, Button, Status, Textarea } from "./ui";
+import { Dialog } from "./dialog";
 import { formatDate } from "@/lib/utils";
 
 function presenceLabel(presence?: Presence | null) {
@@ -28,13 +29,17 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     null,
   );
   const [text, setText] = useState("");
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [feedbackTone, setFeedbackTone] = useState<"status" | "error">("error");
+  const [showBlock, setShowBlock] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportDescription, setReportDescription] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
   const otherUserId = useRef<string | null>(null);
   const router = useRouter();
   const { on } = useRealtime();
 
-  async function load() {
+  const load = useCallback(async () => {
     const [conversationData, messageData] = await Promise.all([
       api<Conversation>(`/conversations/${conversationId}`),
       api<any>(`/conversations/${conversationId}/messages`),
@@ -53,7 +58,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         body: JSON.stringify({ message_id: last.id }),
       });
     }
-  }
+  }, [conversationId]);
 
   useEffect(() => {
     void load();
@@ -86,7 +91,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       stopRead();
       stopConnected();
     };
-  }, [conversationId, on]);
+  }, [conversationId, load, on]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
@@ -122,7 +127,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       });
     } catch (caught: any) {
       setText(value);
-      setError(caught.message);
+      setFeedbackTone("error");
+      setFeedback(caught.message);
     }
   }
 
@@ -134,17 +140,13 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       });
       router.push(`/calls/${result.id}`);
     } catch (caught: any) {
-      setError(caught.message);
+      setFeedbackTone("error");
+      setFeedback(caught.message);
     }
   }
 
   async function block() {
-    if (
-      !conversation ||
-      !confirm(`Chặn ${conversation.other_user.display_name}?`)
-    ) {
-      return;
-    }
+    if (!conversation) return;
     await api(`/users/${conversation.other_user.public_id}/block`, {
       method: "POST",
     });
@@ -153,8 +155,6 @@ export function ChatView({ conversationId }: { conversationId: string }) {
 
   async function report() {
     if (!conversation) return;
-    const description =
-      prompt("Mô tả ngắn nội dung cần báo cáo:") || "";
     const target = messages.at(-1)?.id || conversationId;
     try {
       await api("/reports", {
@@ -164,12 +164,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           target_type: messages.length ? "message" : "profile",
           target_id: target,
           reason_code: "harassment",
-          description,
+          description: reportDescription,
         }),
       });
-      setError("Đã gửi báo cáo tới đội ngũ kiểm duyệt.");
+      setShowReport(false);
+      setReportDescription("");
+      setFeedbackTone("status");
+      setFeedback("Đã gửi báo cáo tới đội ngũ kiểm duyệt.");
     } catch (caught: any) {
-      setError(caught.message);
+      setFeedbackTone("error");
+      setFeedback(caught.message);
     }
   }
 
@@ -204,10 +208,18 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         <Button variant="ghost" title="Gọi video" onClick={call}>
           <Video />
         </Button>
-        <Button variant="ghost" title="Báo cáo" onClick={report}>
+        <Button
+          variant="ghost"
+          title="Báo cáo"
+          onClick={() => setShowReport(true)}
+        >
           <Flag />
         </Button>
-        <Button variant="ghost" title="Chặn" onClick={block}>
+        <Button
+          variant="ghost"
+          title="Chặn"
+          onClick={() => setShowBlock(true)}
+        >
           <UserX />
         </Button>
       </header>
@@ -230,7 +242,12 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         })}
         <div ref={bottom} />
       </div>
-      {error && <div className="error-inline">{error}</div>}
+      {feedback &&
+        (feedbackTone === "error" ? (
+          <Alert className="error-inline">{feedback}</Alert>
+        ) : (
+          <Status className="success-text">{feedback}</Status>
+        ))}
       <div className="composer">
         <Textarea
           rows={1}
@@ -249,6 +266,43 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           <Send size={18} />
         </Button>
       </div>
+      {showBlock && conversation && (
+        <Dialog
+          title={`Chặn ${conversation.other_user.display_name}?`}
+          onClose={() => setShowBlock(false)}
+        >
+          <p>Hai bạn sẽ không còn nhìn thấy hoặc liên hệ với nhau.</p>
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setShowBlock(false)}>
+              Hủy
+            </Button>
+            <Button variant="danger" onClick={() => void block()}>
+              Chặn
+            </Button>
+          </div>
+        </Dialog>
+      )}
+      {showReport && conversation && (
+        <Dialog title="Báo cáo cuộc trò chuyện" onClose={() => setShowReport(false)}>
+          <label className="field">
+            <span>Mô tả ngắn nội dung cần báo cáo</span>
+            <Textarea
+              rows={4}
+              maxLength={2000}
+              value={reportDescription}
+              onChange={(event) => setReportDescription(event.target.value)}
+            />
+          </label>
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setShowReport(false)}>
+              Hủy
+            </Button>
+            <Button variant="danger" onClick={() => void report()}>
+              Gửi báo cáo
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </section>
   );
 }

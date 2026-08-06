@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { CallSession } from "@/lib/types";
-import { Button } from "@/components/ui";
+import { Button, Toast } from "@/components/ui";
 import { useAuth } from "@/components/auth-provider";
 
 function qualityLabel(quality: ConnectionQuality) {
@@ -57,6 +57,7 @@ function Stage({
   const [mediaMessage, setMediaMessage] = useState("");
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [quality, setQuality] = useState(ConnectionQuality.Unknown);
+  const [reportMessage, setReportMessage] = useState("");
 
   const remoteParticipant = useMemo(
     () => participants.find((participant) => !participant.isLocal),
@@ -190,7 +191,7 @@ function Stage({
         description: "Báo cáo từ màn hình cuộc gọi",
       }),
     });
-    alert("Đã gửi báo cáo.");
+    setReportMessage("Đã gửi báo cáo.");
   }
 
   return (
@@ -209,6 +210,9 @@ function Stage({
         <Signal size={16} /> {qualityLabel(quality)}
       </div>
       {mediaMessage && <div className="call-media-message">{mediaMessage}</div>}
+      {reportMessage && (
+        <Toast onDismiss={() => setReportMessage("")}>{reportMessage}</Toast>
+      )}
       <div className="call-controls">
         <Button
           variant="secondary"

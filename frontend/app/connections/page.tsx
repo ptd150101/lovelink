@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Connection } from "@/lib/types";
 import { Button, Card, Empty } from "@/components/ui";
+import { Dialog } from "@/components/dialog";
 import { formatDate } from "@/lib/utils";
 
 type Tab = "received" | "sent" | "accepted";
@@ -13,8 +14,9 @@ export default function Connections() {
   const [tab, setTab] = useState<Tab>("received");
   const [items, setItems] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState<Connection | null>(null);
 
-  async function load(nextTab = tab) {
+  const load = useCallback(async (nextTab: Tab) => {
     setLoading(true);
     try {
       const response = await api<any>(`/connections/${nextTab}`);
@@ -22,27 +24,21 @@ export default function Connections() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    load();
-  }, [tab]);
+    void load(tab);
+  }, [load, tab]);
 
   async function action(id: string, name: string) {
     await api(`/connections/${id}/${name}`, { method: "POST" });
-    await load();
+    await load(tab);
   }
 
   async function disconnect(connection: Connection) {
-    if (
-      !confirm(
-        `Hủy kết nối với ${connection.other_user.display_name}? Hai bên sẽ không thể nhắn tin hoặc gọi video cho đến khi kết nối lại.`,
-      )
-    ) {
-      return;
-    }
     await api(`/connections/${connection.id}`, { method: "DELETE" });
-    await load();
+    setDisconnecting(null);
+    await load(tab);
   }
 
   return (
@@ -120,7 +116,7 @@ export default function Connections() {
                       </Link>
                       <Button
                         variant="secondary"
-                        onClick={() => disconnect(connection)}
+                        onClick={() => setDisconnecting(connection)}
                       >
                         Hủy kết nối
                       </Button>
@@ -142,6 +138,27 @@ export default function Connections() {
                 : "Kết nối được chấp nhận sẽ xuất hiện ở đây."
           }
         />
+      )}
+      {disconnecting && (
+        <Dialog
+          title={`Hủy kết nối với ${disconnecting.other_user.display_name}?`}
+          onClose={() => setDisconnecting(null)}
+        >
+          <p>
+            Hai bên sẽ không thể nhắn tin hoặc gọi video cho đến khi kết nối lại.
+          </p>
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setDisconnecting(null)}>
+              Giữ kết nối
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void disconnect(disconnecting)}
+            >
+              Hủy kết nối
+            </Button>
+          </div>
+        </Dialog>
       )}
     </div>
   );

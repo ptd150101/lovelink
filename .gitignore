@@ -20,3 +20,7 @@ frontend/test-results/
 .vscode/
 coverage.xml
 htmlcov/
+/c*.txt
+/backend/celerybeat-schedule*
+.claude
+.impeccable

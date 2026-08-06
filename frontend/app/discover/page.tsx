@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { Profile } from "@/lib/types";
 import { ProfileCard } from "@/components/profile-card";
-import { Button, Empty, Field, Input, Select } from "@/components/ui";
+import { Badge, Button, Empty, Field, Input, Select } from "@/components/ui";
+import { Dialog } from "@/components/dialog";
 
 type Choice = [string, string];
 type Ref = {
@@ -102,8 +103,9 @@ export default function Discover() {
   const [next, setNext] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(defaults);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  function query(current = filters) {
+  const query = useCallback((current: Filters) => {
     const params = new URLSearchParams();
     Object.entries(current).forEach(([key, value]) => {
       if (Array.isArray(value)) {
@@ -113,33 +115,32 @@ export default function Discover() {
       }
     });
     return params;
-  }
+  }, []);
 
-  async function load(
-    current = filters,
-    append = false,
-    url?: string,
-  ) {
-    setLoading(true);
-    try {
-      const response = await api<any>(
-        url
-          ? url.replace(/^.*\/api\/v1/, "")
-          : `/discover?${query(current)}`,
-      );
-      setItems((existing) =>
-        append
-          ? [...existing, ...(response.results || [])]
-          : response.results || response,
-      );
-      setNext(response.next || null);
-      if (typeof window !== "undefined" && !append) {
-        history.replaceState(null, "", `/discover?${query(current)}`);
+  const load = useCallback(
+    async (current: Filters, append = false, url?: string) => {
+      setLoading(true);
+      try {
+        const response = await api<any>(
+          url
+            ? url.replace(/^.*\/api\/v1/, "")
+            : `/discover?${query(current)}`,
+        );
+        setItems((existing) =>
+          append
+            ? [...existing, ...(response.results || [])]
+            : response.results || response,
+        );
+        setNext(response.next || null);
+        if (typeof window !== "undefined" && !append) {
+          history.replaceState(null, "", `/discover?${query(current)}`);
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [query],
+  );
 
   useEffect(() => {
     api<Ref>("/reference-data").then(setReference);
@@ -170,12 +171,97 @@ export default function Discover() {
       }
     }
     setFilters(restored);
+    setShowAdvancedFilters(
+      restored.min_height !== "" ||
+        restored.max_height !== "" ||
+        restored.gender.length > 0 ||
+        restored.hometown.length > 0 ||
+        restored.occupation.length > 0 ||
+        restored.education.length > 0 ||
+        restored.income.length > 0 ||
+        restored.verified ||
+        restored.has_photo !== defaults.has_photo ||
+        restored.active_within_days !== "",
+    );
     void load(restored);
-  }, []);
+  }, [load]);
+
+  const clearAll = useCallback(() => {
+    const reset: Filters = {
+      ...defaults,
+      gender: [],
+      province: [],
+      hometown: [],
+      occupation: [],
+      education: [],
+      income: [],
+      goal: [],
+    };
+    setFilters(reset);
+    void load(reset);
+  }, [load]);
 
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
+
+  const activeFilters = useMemo(() => {
+    if (!reference) return [];
+    const chips: { key: keyof Filters; value: string; label: string }[] = [];
+    if (filters.min_age !== defaults.min_age || filters.max_age !== defaults.max_age) {
+      chips.push({ key: "min_age", value: "age", label: `${filters.min_age}–${filters.max_age} tuổi` });
+    }
+    filters.province.forEach((value) => chips.push({ key: "province", value, label: reference.provinces.find((x) => x.code === value)?.name || value }));
+    filters.goal.forEach((value) => chips.push({ key: "goal", value, label: reference.choices.goals.find(([x]) => x === value)?.[1] || value }));
+    if (filters.min_height || filters.max_height) chips.push({ key: "min_height", value: "height", label: `${filters.min_height || "120"}–${filters.max_height || "230"} cm` });
+    filters.gender.forEach((value) => chips.push({ key: "gender", value, label: reference.choices.genders.find(([x]) => x === value)?.[1] || value }));
+    filters.hometown.forEach((value) => chips.push({ key: "hometown", value, label: `Quê: ${reference.provinces.find((x) => x.code === value)?.name || value}` }));
+    filters.occupation.forEach((value) => chips.push({ key: "occupation", value, label: reference.occupations.find((x) => x.id === value)?.name || value }));
+    filters.education.forEach((value) => chips.push({ key: "education", value, label: reference.choices.education.find(([x]) => x === value)?.[1] || value }));
+    filters.income.forEach((value) => chips.push({ key: "income", value, label: reference.choices.income.find(([x]) => x === value)?.[1] || value }));
+    if (filters.active_within_days) chips.push({ key: "active_within_days", value: filters.active_within_days, label: `Hoạt động trong ${filters.active_within_days} ngày` });
+    if (filters.verified) chips.push({ key: "verified", value: "verified", label: "Đã xác minh" });
+    if (filters.has_photo !== defaults.has_photo) chips.push({ key: "has_photo", value: "has_photo", label: filters.has_photo ? "Có ảnh" : "Không yêu cầu ảnh" });
+    return chips;
+  }, [filters, reference]);
+
+  function removeFilter(key: keyof Filters, value: string) {
+    if (key === "min_age") setFilters({ ...filters, min_age: defaults.min_age, max_age: defaults.max_age });
+    else if (key === "min_height") setFilters({ ...filters, min_height: "", max_height: "" });
+    else if (Array.isArray(filters[key])) setFilters({ ...filters, [key]: (filters[key] as string[]).filter((item) => item !== value) });
+    else if (key === "verified") set("verified", false);
+    else if (key === "has_photo") set("has_photo", defaults.has_photo);
+    else if (key === "active_within_days") set("active_within_days", "");
+  }
+
+  const advancedFilters = (
+    <>
+      <div className="two">
+        <Field label="Cao từ">
+          <Input type="number" min={120} max={230} value={filters.min_height} onChange={(event) => set("min_height", event.target.value)} />
+        </Field>
+        <Field label="Đến">
+          <Input type="number" min={120} max={230} value={filters.max_height} onChange={(event) => set("max_height", event.target.value)} />
+        </Field>
+      </div>
+      {reference && (
+        <>
+          <MultiCheck label="Giới tính" values={filters.gender} options={reference.choices.genders.map(([value, label]) => ({ value, label }))} onChange={(values) => set("gender", values)} />
+          <MultiCheck label="Quê quán" values={filters.hometown} options={reference.provinces.map((item) => ({ value: item.code, label: item.name }))} onChange={(values) => set("hometown", values)} />
+          <MultiCheck label="Nghề nghiệp" values={filters.occupation} options={reference.occupations.map((item) => ({ value: item.id, label: item.name }))} onChange={(values) => set("occupation", values)} />
+          <MultiCheck label="Học vấn" values={filters.education} options={reference.choices.education.map(([value, label]) => ({ value, label }))} onChange={(values) => set("education", values)} />
+          <MultiCheck label="Thu nhập" values={filters.income} options={reference.choices.income.map(([value, label]) => ({ value, label }))} onChange={(values) => set("income", values)} />
+        </>
+      )}
+      <Field label="Hoạt động gần đây">
+        <Select value={filters.active_within_days} onChange={(event) => set("active_within_days", event.target.value)}>
+          <option value="">Không giới hạn</option><option value="1">Trong 24 giờ</option><option value="3">Trong 3 ngày</option><option value="7">Trong 7 ngày</option><option value="30">Trong 30 ngày</option>
+        </Select>
+      </Field>
+      <label className="check"><input type="checkbox" checked={filters.has_photo} onChange={(event) => set("has_photo", event.target.checked)} /> Chỉ hồ sơ có ảnh</label>
+      <label className="check"><input type="checkbox" checked={filters.verified} onChange={(event) => set("verified", event.target.checked)} /> Chỉ hồ sơ tích xanh</label>
+    </>
+  );
 
   const filtersUi = (
     <>
@@ -221,132 +307,31 @@ export default function Discover() {
         </Field>
       </div>
       {reference && (
-        <>
-          <MultiCheck
-            label="Giới tính"
-            values={filters.gender}
-            options={reference.choices.genders.map(([value, label]) => ({
-              value,
-              label,
-            }))}
-            onChange={(values) => set("gender", values)}
-          />
-          <MultiCheck
-            label="Nơi ở"
-            values={filters.province}
-            options={reference.provinces.map((item) => ({
-              value: item.code,
-              label: item.name,
-            }))}
-            onChange={(values) => set("province", values)}
-          />
-          <MultiCheck
-            label="Quê quán"
-            values={filters.hometown}
-            options={reference.provinces.map((item) => ({
-              value: item.code,
-              label: item.name,
-            }))}
-            onChange={(values) => set("hometown", values)}
-          />
-          <MultiCheck
-            label="Nghề nghiệp"
-            values={filters.occupation}
-            options={reference.occupations.map((item) => ({
-              value: item.id,
-              label: item.name,
-            }))}
-            onChange={(values) => set("occupation", values)}
-          />
-          <MultiCheck
-            label="Học vấn"
-            values={filters.education}
-            options={reference.choices.education.map(([value, label]) => ({
-              value,
-              label,
-            }))}
-            onChange={(values) => set("education", values)}
-          />
-          <MultiCheck
-            label="Thu nhập"
-            values={filters.income}
-            options={reference.choices.income.map(([value, label]) => ({
-              value,
-              label,
-            }))}
-            onChange={(values) => set("income", values)}
-          />
-          <MultiCheck
-            label="Mục tiêu"
-            values={filters.goal}
-            options={reference.choices.goals.map(([value, label]) => ({
-              value,
-              label,
-            }))}
-            onChange={(values) => set("goal", values)}
-          />
-        </>
+        <MultiCheck
+          label="Nơi ở"
+          values={filters.province}
+          options={reference.provinces.map((item) => ({ value: item.code, label: item.name }))}
+          onChange={(values) => set("province", values)}
+        />
       )}
-      <Field label="Hoạt động gần đây">
-        <Select
-          value={filters.active_within_days}
-          onChange={(event) =>
-            set("active_within_days", event.target.value)
-          }
-        >
-          <option value="">Không giới hạn</option>
-          <option value="1">Trong 24 giờ</option>
-          <option value="3">Trong 3 ngày</option>
-          <option value="7">Trong 7 ngày</option>
-          <option value="30">Trong 30 ngày</option>
-        </Select>
-      </Field>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={filters.has_photo}
-          onChange={(event) => set("has_photo", event.target.checked)}
+      {reference && (
+        <MultiCheck
+          label="Mục tiêu"
+          values={filters.goal}
+          options={reference.choices.goals.map(([value, label]) => ({ value, label }))}
+          onChange={(values) => set("goal", values)}
         />
-        Chỉ hồ sơ có ảnh
-      </label>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={filters.verified}
-          onChange={(event) => set("verified", event.target.checked)}
-        />
-        Chỉ hồ sơ tích xanh
-      </label>
-      <Button
-        className="full"
-        onClick={() => {
-          void load();
-          setFilterOpen(false);
-        }}
-      >
+      )}
+      <Button variant="secondary" className="full" onClick={() => setShowAdvancedFilters((current) => !current)} aria-expanded={showAdvancedFilters}>
+        {showAdvancedFilters ? "Ẩn tiêu chí nâng cao" : "Thêm tiêu chí"}
+      </Button>
+      {showAdvancedFilters && advancedFilters}
+      <Button className="full" onClick={() => { void load(filters); setFilterOpen(false); }}>
         Áp dụng
       </Button>
-      <Button
-        variant="ghost"
-        className="full"
-        onClick={() => {
-          const reset: Filters = {
-            ...defaults,
-            gender: [],
-            province: [],
-            hometown: [],
-            occupation: [],
-            education: [],
-            income: [],
-            goal: [],
-          };
-          setFilters(reset);
-          void load(reset);
-          setFilterOpen(false);
-        }}
-      >
-        Xóa bộ lọc
-      </Button>
+      <Button variant="ghost" className="full" onClick={() => { clearAll(); setFilterOpen(false); }}>
+        Xóa tất cả bộ lọc
+      </Button>,
     </>
   );
 
@@ -380,9 +365,22 @@ export default function Discover() {
           </Select>
         </div>
       </div>
+      <div className="discover-summary" aria-live="polite">
+        <div className="active-filter-chips">
+          <strong>Bộ lọc đang dùng: {activeFilters.length}</strong>
+          {activeFilters.map((chip) => (
+            <Badge key={`${chip.key}-${chip.value}`}>
+              {chip.label}
+              <button type="button" aria-label={`Xóa bộ lọc ${chip.label}`} onClick={() => removeFilter(chip.key, chip.value)}>×</button>
+            </Badge>
+          ))}
+          {!!activeFilters.length && <Button variant="ghost" onClick={clearAll}>Xóa tất cả</Button>}
+        </div>
+      </div>
       <div className="discover-layout">
         <aside className="filter-panel">{filtersUi}</aside>
         <section>
+          <div className="results-count" aria-live="polite">{loading ? "Đang tìm hồ sơ…" : `${items.length} hồ sơ`}</div>
           {loading && !items.length ? (
             <div className="empty">Đang tải hồ sơ…</div>
           ) : items.length ? (
@@ -408,19 +406,26 @@ export default function Discover() {
             <Empty
               title="Chưa tìm thấy hồ sơ"
               body="Hãy thử nới lỏng một vài điều kiện lọc."
+              action={<Button variant="secondary" onClick={clearAll}>Xóa tất cả bộ lọc</Button>}
             />
           )}
         </section>
       </div>
       {filterOpen && (
-        <div className="modal-backdrop mobile-filter-modal">
-          <aside className="filter-panel">
-            <Button variant="ghost" onClick={() => setFilterOpen(false)}>
-              Đóng
-            </Button>
-            {filtersUi}
-          </aside>
-        </div>
+        <Dialog
+          title="Bộ lọc"
+          onClose={() => setFilterOpen(false)}
+          overlayClassName="modal-backdrop mobile-filter-modal"
+          contentClassName="filter-panel"
+        >
+          <Button
+            variant="ghost"
+            onClick={() => setFilterOpen(false)}
+          >
+            Đóng
+          </Button>
+          {filtersUi}
+        </Dialog>
       )}
     </div>
   );

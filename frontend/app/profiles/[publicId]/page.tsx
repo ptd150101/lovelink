@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   BadgeCheck,
@@ -21,7 +21,9 @@ import {
   Field,
   Select,
   Textarea,
+  Toast,
 } from "@/components/ui";
+import { Dialog } from "@/components/dialog";
 
 export default function ProfileDetail() {
   const { publicId } = useParams<{ publicId: string }>();
@@ -29,12 +31,17 @@ export default function ProfileDetail() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [intro, setIntro] = useState("");
   const [showIntro, setShowIntro] = useState(false);
+  const [showBlock, setShowBlock] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [report, setReport] = useState({
     reason_code: "fake",
     description: "",
   });
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"status" | "error">("status");
+  const introTriggerRef = useRef<HTMLButtonElement>(null);
+  const introRef = useRef<HTMLTextAreaElement>(null);
+  const reportRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
     api<Profile>(`/profiles/${publicId}`)
@@ -52,22 +59,18 @@ export default function ProfileDetail() {
         }),
       });
       setShowIntro(false);
+      setMessageTone("status");
       setMessage("Đã gửi lời làm quen.");
       setProfile((current) =>
         current ? { ...current, connection_status: "pending_sent" } : current,
       );
     } catch (caught: any) {
+      setMessageTone("error");
       setMessage(caught.message);
     }
   }
 
   async function block() {
-    if (
-      !confirm(
-        "Chặn người này? Hai bạn sẽ không còn nhìn thấy hoặc liên hệ với nhau.",
-      )
-    )
-      return;
     await api(`/users/${publicId}/block`, { method: "POST" });
     router.push("/discover");
   }
@@ -84,8 +87,10 @@ export default function ProfileDetail() {
         }),
       });
       setShowReport(false);
+      setMessageTone("status");
       setMessage("Đã gửi báo cáo tới đội ngũ kiểm duyệt.");
     } catch (caught: any) {
+      setMessageTone("error");
       setMessage(caught.message);
     }
   }
@@ -178,6 +183,7 @@ export default function ProfileDetail() {
           )}
           <div className="profile-actions">
             <Button
+              ref={introTriggerRef}
               disabled={
                 !!profile.connection_status &&
                 profile.connection_status !== "none"
@@ -190,7 +196,7 @@ export default function ProfileDetail() {
                 ? "Đã có trạng thái kết nối"
                 : "Gửi lời làm quen"}
             </Button>
-            <Button variant="secondary" onClick={() => void block()}>
+            <Button variant="secondary" onClick={() => setShowBlock(true)}>
               <UserX size={18} /> Chặn
             </Button>
             <Button variant="ghost" onClick={() => setShowReport(true)}>
@@ -262,78 +268,98 @@ export default function ProfileDetail() {
         </Card>
       </div>
       {showIntro && (
-        <div className="modal-backdrop">
-          <Card className="modal-card">
-            <h2>Gửi lời làm quen tới {profile.display_name}</h2>
-            <Field label="Lời nhắn" hint={`${intro.length}/300 ký tự`}>
-              <Textarea
-                maxLength={300}
-                rows={5}
-                value={intro}
-                onChange={(event) => setIntro(event.target.value)}
-                placeholder="Giới thiệu ngắn gọn và lịch sự…"
-              />
-            </Field>
-            <div className="form-actions">
-              <Button variant="secondary" onClick={() => setShowIntro(false)}>
-                Hủy
-              </Button>
-              <Button disabled={!intro.trim()} onClick={() => void connect()}>
-                Gửi
-              </Button>
-            </div>
-          </Card>
-        </div>
+        <Dialog
+          title={`Gửi lời làm quen tới ${profile.display_name}`}
+          onClose={() => setShowIntro(false)}
+          initialFocusRef={introRef}
+          returnFocusRef={introTriggerRef}
+        >
+          <Field label="Lời nhắn" hint={`${intro.length}/300 ký tự`}>
+            <Textarea
+              ref={introRef}
+              maxLength={300}
+              rows={5}
+              value={intro}
+              onChange={(event) => setIntro(event.target.value)}
+              placeholder="Giới thiệu ngắn gọn và lịch sự…"
+            />
+          </Field>
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setShowIntro(false)}>
+              Hủy
+            </Button>
+            <Button disabled={!intro.trim()} onClick={() => void connect()}>
+              Gửi
+            </Button>
+          </div>
+        </Dialog>
+      )}
+      {showBlock && (
+        <Dialog title="Chặn người này?" onClose={() => setShowBlock(false)}>
+          <p>
+            Hai bạn sẽ không còn nhìn thấy hoặc liên hệ với nhau.
+          </p>
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setShowBlock(false)}>
+              Hủy
+            </Button>
+            <Button variant="danger" onClick={() => void block()}>
+              Chặn
+            </Button>
+          </div>
+        </Dialog>
       )}
       {showReport && (
-        <div className="modal-backdrop">
-          <Card className="modal-card">
-            <h2>Báo cáo hồ sơ</h2>
-            <Field label="Lý do">
-              <Select
-                value={report.reason_code}
-                onChange={(event) =>
-                  setReport({ ...report, reason_code: event.target.value })
-                }
-              >
-                <option value="fake">Hồ sơ giả mạo</option>
-                <option value="scam">Lừa đảo</option>
-                <option value="harassment">Quấy rối</option>
-                <option value="sexual">Nội dung không phù hợp</option>
-                <option value="threat">Đe dọa</option>
-                <option value="spam">Spam</option>
-                <option value="underage">Có dấu hiệu chưa đủ tuổi</option>
-                <option value="other">Khác</option>
-              </Select>
-            </Field>
-            <Field label="Mô tả">
-              <Textarea
-                rows={4}
-                maxLength={2000}
-                value={report.description}
-                onChange={(event) =>
-                  setReport({ ...report, description: event.target.value })
-                }
-              />
-            </Field>
-            <div className="form-actions">
-              <Button
-                variant="secondary"
-                onClick={() => setShowReport(false)}
-              >
-                Hủy
-              </Button>
-              <Button variant="danger" onClick={() => void submitReport()}>
-                Gửi báo cáo
-              </Button>
-            </div>
-          </Card>
-        </div>
+        <Dialog
+          title="Báo cáo hồ sơ"
+          onClose={() => setShowReport(false)}
+          initialFocusRef={reportRef}
+        >
+          <Field label="Lý do">
+            <Select
+              ref={reportRef}
+              value={report.reason_code}
+              onChange={(event) =>
+                setReport({ ...report, reason_code: event.target.value })
+              }
+            >
+              <option value="fake">Hồ sơ giả mạo</option>
+              <option value="scam">Lừa đảo</option>
+              <option value="harassment">Quấy rối</option>
+              <option value="sexual">Nội dung không phù hợp</option>
+              <option value="threat">Đe dọa</option>
+              <option value="spam">Spam</option>
+              <option value="underage">Có dấu hiệu chưa đủ tuổi</option>
+              <option value="other">Khác</option>
+            </Select>
+          </Field>
+          <Field label="Mô tả">
+            <Textarea
+              rows={4}
+              maxLength={2000}
+              value={report.description}
+              onChange={(event) =>
+                setReport({ ...report, description: event.target.value })
+              }
+            />
+          </Field>
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setShowReport(false)}>
+              Hủy
+            </Button>
+            <Button variant="danger" onClick={() => void submitReport()}>
+              Gửi báo cáo
+            </Button>
+          </div>
+        </Dialog>
       )}
       {message && (
-        <div className="toast" onClick={() => setMessage("")}> 
+        <Toast
+          tone={messageTone}
+          onDismiss={() => setMessage("")}
+        >
           {message}
-        </div>
+        </Toast>
       )}
     </div>
   );

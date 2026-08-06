@@ -16,6 +16,7 @@ import { useAuth } from "./auth-provider";
 import { useRealtime } from "./realtime-provider";
 import { api } from "@/lib/api";
 import { Button } from "./ui";
+import { Dialog } from "./dialog";
 
 const nav = [
   ["/discover", "Khám phá", Search],
@@ -106,21 +107,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       {incomingCall && (
-        <div className="call-overlay">
-          <div className="incoming-card">
-            <Video size={36} />
-            <h2>{incomingCall.caller.display_name}</h2>
-            <p>đang gọi video cho bạn</p>
-            <div>
-              <Button variant="danger" onClick={() => respond(false)}>
-                <X size={18} /> Từ chối
-              </Button>
-              <Button onClick={() => respond(true)}>
-                <Video size={18} /> Trả lời
-              </Button>
-            </div>
+        <Dialog
+          title={incomingCall.caller.display_name}
+          onClose={() => void respond(false)}
+          leading={<Video size={36} />}
+          overlayClassName="call-overlay"
+          contentClassName="incoming-card"
+        >
+          <p>đang gọi video cho bạn</p>
+          <div>
+            <Button variant="danger" onClick={() => void respond(false)}>
+              <X size={18} /> Từ chối
+            </Button>
+            <Button onClick={() => void respond(true)}>
+              <Video size={18} /> Trả lời
+            </Button>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

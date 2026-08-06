@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Card, Field, Input } from "./ui";
+import { Alert, Button, Field, Input } from "./ui";
+import { Dialog } from "./dialog";
 
 const OUTPUT_WIDTH = 1200;
 const OUTPUT_HEIGHT = 1500;
@@ -82,9 +83,12 @@ export function ImageCropper({
   }
 
   return (
-    <div className="modal-backdrop crop-modal">
-      <Card className="modal-card crop-card">
-        <h2>Cắt ảnh theo tỷ lệ 4:5</h2>
+    <Dialog
+      title="Cắt ảnh theo tỷ lệ 4:5"
+      onClose={onCancel}
+      overlayClassName="modal-backdrop crop-modal"
+      contentClassName="modal-card crop-card"
+    >
         <p className="muted">
           Điều chỉnh vị trí và độ phóng để khuôn mặt nằm rõ trong khung.
         </p>
@@ -131,7 +135,7 @@ export function ImageCropper({
             />
           </Field>
         </div>
-        {error && <p className="error-inline">{error}</p>}
+        {error && <Alert className="error-inline">{error}</Alert>}
         <div className="form-actions">
           <Button variant="secondary" disabled={busy} onClick={onCancel}>
             Hủy
@@ -140,7 +144,6 @@ export function ImageCropper({
             {busy ? "Đang xử lý…" : "Dùng ảnh này"}
           </Button>
         </div>
-      </Card>
-    </div>
+    </Dialog>
   );
 }
