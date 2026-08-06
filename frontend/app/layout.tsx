@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 export const metadata: Metadata = {
   title: "LoveLink — Kết nối chân thành",
   description: "Nền tảng hẹn hò với hồ sơ được xác minh",
+  icons: { icon: "/icon.svg" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
