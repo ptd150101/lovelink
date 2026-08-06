@@ -1,1 +1,1 @@
-import {ProfileEditor} from "@/components/profile-editor";export default function Page(){return <ProfileEditor step="basic"/>}
+import {ProfileEditor} from "@/components/profile-editor";export default function Page(){return <ProfileEditor step="basic" edit/>}

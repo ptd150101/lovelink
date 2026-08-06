@@ -296,7 +296,7 @@ export function ProfileTextAndInterests({
   );
 }
 
-const privacyFields: Record<string, string> = {
+export const PRIVACY_FIELDS: Record<string, string> = {
   income_band: "Thu nhập",
   hometown_province: "Quê quán",
   current_province: "Nơi ở",
@@ -315,7 +315,7 @@ export function PrivacyProfileFields({ profile, setField }: Props) {
       <p className="muted">
         Email, số điện thoại và ngày sinh đầy đủ luôn được giữ riêng tư.
       </p>
-      {Object.entries(privacyFields).map(([field, label]) => (
+      {Object.entries(PRIVACY_FIELDS).map(([field, label]) => (
         <Field key={field} label={label}>
           <Select
             value={(profile.field_visibility || {})[field] || "members"}
@@ -361,9 +361,16 @@ export function ProfileReview({ profile }: { profile: any }) {
           <dd>{profile.completion_percent}%</dd>
         </div>
       </dl>
+      <h3>Ai có thể xem thông tin này?</h3>
+      <dl className="detail-list">
+        {Object.entries(PRIVACY_FIELDS).map(([field, label]) => {
+          const visibility = (profile.field_visibility || {})[field] || (field === "income_band" ? "connections" : "members");
+          const text = visibility === "private" ? "Chỉ bạn" : visibility === "connections" ? "Người đã kết nối" : "Thành viên LoveLink";
+          return <div key={field}><dt>{label}</dt><dd>{text}</dd></div>;
+        })}
+      </dl>
       <p className="muted">
-        Sau khi công khai, hồ sơ sẽ xuất hiện trong Khám phá. Bạn có thể ẩn hồ
-        sơ bất kỳ lúc nào.
+        Sau khi công khai, hồ sơ sẽ xuất hiện trong Khám phá. Bạn có thể ẩn hồ sơ bất kỳ lúc nào.
       </p>
     </Card>
   );

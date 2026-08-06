@@ -24,3 +24,19 @@
 @media(max-width:700px){.topbar{padding:10px 14px}.primary-nav,.secondary-nav{display:none}.account-area{display:flex;align-items:center;gap:4px}.app-main{padding-bottom:84px}.mobile-menu-button{display:grid}}
 @media(min-width:701px){.mobile-menu-button,.mobile-menu{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}html{scroll-behavior:auto}}
+
+/* Typography rhythm */
+body{font-size:16px;line-height:1.5;text-rendering:optimizeLegibility}
+h1,h2,h3{margin:0 0 .5em;color:var(--text)}
+h1{font-size:2rem;line-height:1.15;font-weight:750;letter-spacing:-.035em}
+h2{font-size:1.5rem;line-height:1.25;font-weight:750;letter-spacing:-.02em}
+h3{font-size:1.125rem;line-height:1.35;font-weight:700}
+p{line-height:1.6;margin:0 0 1rem}
+.eyebrow{font-size:.75rem;line-height:1.2;font-weight:800;letter-spacing:.14em}
+.field>span{font-size:.9375rem;font-weight:600;line-height:1.35}
+.field small,.muted,small{font-size:.8125rem;line-height:1.4}
+.profile-card-body h3{font-size:1.125rem;line-height:1.35;font-weight:700}
+.page-heading h1{font-size:2rem;line-height:1.15;font-weight:750}
+.hero h1{font-weight:800;line-height:1.02;letter-spacing:-.04em}
+.hero p{font-size:1.125rem;line-height:1.65}
+@media(max-width:700px){h1,.page-heading h1{font-size:1.625rem;line-height:1.2}h2{font-size:1.25rem}.hero h1{font-size:clamp(2.5rem,12vw,4rem)}.hero p{font-size:1rem;line-height:1.6}.conversation-meta,.results-count{font-size:.8125rem;line-height:1.4}}

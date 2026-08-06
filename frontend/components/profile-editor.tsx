@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, uploadToSignedUrl } from "@/lib/api";
 import type { Photo, Profile } from "@/lib/types";
-import { Alert, Button, Card } from "./ui";
+import { Alert, Button, Card, Status } from "./ui";
 import { PhotoManager } from "./photo-manager";
 import {
   BasicProfileFields,
@@ -37,6 +37,7 @@ export function ProfileEditor({
   const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -101,6 +102,7 @@ export function ProfileEditor({
     setError("");
     try {
       await persist();
+      setSaved(true);
       router.push(next || "/me/profile");
     } catch (caught: any) {
       setError(caught.message);
@@ -262,6 +264,7 @@ export function ProfileEditor({
       )}
 
       {error && <Alert>{error}</Alert>}
+      {saved && <Status className="success-text">Đã lưu thay đổi. Bạn có thể tiếp tục chỉnh sửa bất cứ lúc nào.</Status>}
       <div className="form-actions">
         {index > 0 && !edit && (
           <Button
