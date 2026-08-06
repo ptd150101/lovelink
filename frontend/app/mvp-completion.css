@@ -35,12 +35,15 @@
   right: 7px;
   bottom: 7px;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 96px;
   gap: 5px;
 }
 .photo-manager .photo-item-actions button {
   position: static;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 9px;

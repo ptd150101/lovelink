@@ -114,6 +114,11 @@ export default function ProfileDetail() {
               className="profile-main-photo"
               src={primary.public_url}
               alt={profile.display_name}
+              width={1200}
+              height={1500}
+              loading="eager"
+              decoding="async"
+              sizes="(max-width: 980px) 100vw, 480px"
             />
           ) : (
             <div className="profile-main-photo placeholder">
@@ -122,7 +127,16 @@ export default function ProfileDetail() {
           )}
           <div className="profile-thumbs">
             {profile.photos.slice(1).map((photo) => (
-              <img key={photo.id} src={photo.public_url} alt="Ảnh hồ sơ" />
+              <img
+                key={photo.id}
+                src={photo.thumbnail_url || photo.public_url}
+                alt="Ảnh hồ sơ"
+                width={480}
+                height={600}
+                loading="lazy"
+                decoding="async"
+                sizes="80px"
+              />
             ))}
           </div>
         </div>

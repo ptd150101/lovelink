@@ -10,7 +10,15 @@ export function ProfileCard({ profile }: { profile: Profile }) {
     <article className="profile-card">
       <Link href={`/profiles/${profile.public_id}`} className="photo-wrap">
         {photo ? (
-          <img src={photo} alt={profile.display_name} />
+          <img
+            src={photo}
+            alt={profile.display_name}
+            width={480}
+            height={600}
+            loading="lazy"
+            decoding="async"
+            sizes="(max-width: 700px) 50vw, (max-width: 980px) 33vw, 280px"
+          />
         ) : (
           <div className="photo-placeholder">
             {profile.display_name?.[0] || "?"}

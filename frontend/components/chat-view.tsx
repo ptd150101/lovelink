@@ -185,8 +185,15 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         <div className="mini-avatar">
           {conversation.other_user.primary_photo?.public_url ? (
             <img
-              src={conversation.other_user.primary_photo.public_url}
+              src={
+                conversation.other_user.primary_photo.thumbnail_url ||
+                conversation.other_user.primary_photo.public_url
+              }
               alt=""
+              width={62}
+              height={62}
+              loading="eager"
+              decoding="async"
             />
           ) : (
             conversation.other_user.display_name[0]

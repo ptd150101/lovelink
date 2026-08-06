@@ -62,6 +62,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
     let recoveryTimer: ReturnType<typeof setInterval> | undefined;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let reconnectAttempts = 0;
 
     async function recoverIncomingCall() {
       try {
@@ -69,6 +70,32 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         if (!stopped) setIncomingCall(validCall(response) ? response : null);
       } catch {
         // A transient recovery failure must not break the realtime connection.
+      }
+    }
+
+    function stopFallbackPolling() {
+      if (recoveryTimer) {
+        clearInterval(recoveryTimer);
+        recoveryTimer = undefined;
+      }
+    }
+
+    function startFallbackPolling() {
+      if (recoveryTimer || stopped) return;
+      recoveryTimer = setInterval(() => {
+        if (socket?.readyState !== WebSocket.OPEN) {
+          void recoverIncomingCall();
+        } else {
+          stopFallbackPolling();
+        }
+      }, 15_000);
+    }
+
+    function handleFocusOrOnline() {
+      if (stopped) return;
+      void recoverIncomingCall();
+      if (!socket || socket.readyState === WebSocket.CLOSED) {
+        connect();
       }
     }
 
@@ -99,14 +126,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }
 
     function connect() {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       socket = new WebSocket(
         process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/app",
       );
       socket.onopen = async () => {
+        reconnectAttempts = 0;
+        stopFallbackPolling();
         await recoverIncomingCall();
         if (!stopped) {
           dispatch("realtime.connected", { recovered_at: new Date().toISOString() });
         }
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
         heartbeatTimer = setInterval(() => {
           if (socket?.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: "presence.ping" }));
@@ -123,16 +154,25 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       };
       socket.onclose = () => {
         if (heartbeatTimer) clearInterval(heartbeatTimer);
-        if (!stopped) reconnectTimer = setTimeout(connect, 1_500);
+        if (!stopped) {
+          startFallbackPolling();
+          reconnectAttempts += 1;
+          const delay = Math.min(1500 * Math.pow(1.5, reconnectAttempts - 1), 30_000);
+          reconnectTimer = setTimeout(connect, delay);
+        }
       };
     }
 
     void recoverIncomingCall();
-    recoveryTimer = setInterval(recoverIncomingCall, 10_000);
     connect();
+
+    window.addEventListener("online", handleFocusOrOnline);
+    window.addEventListener("focus", handleFocusOrOnline);
 
     return () => {
       stopped = true;
+      window.removeEventListener("online", handleFocusOrOnline);
+      window.removeEventListener("focus", handleFocusOrOnline);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (recoveryTimer) clearInterval(recoveryTimer);
       if (reconnectTimer) clearTimeout(reconnectTimer);

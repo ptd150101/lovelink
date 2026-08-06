@@ -64,7 +64,18 @@ export default function MyProfile() {
       </div>
       <Card className="my-profile-card">
         <div className="my-avatar">
-          {photo ? <img src={photo} alt="" /> : profile.display_name?.[0]}
+          {photo ? (
+            <img
+              src={photo}
+              alt=""
+              width={100}
+              height={100}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            profile.display_name?.[0]
+          )}
         </div>
         <div>
           <h2>

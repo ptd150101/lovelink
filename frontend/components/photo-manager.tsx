@@ -63,7 +63,15 @@ export function PhotoManager({
             onDragOver={(event) => event.preventDefault()}
             onDrop={() => drop(photo.id)}
           >
-            <img src={photo.public_url} alt={`Ảnh hồ sơ ${index + 1}`} />
+            <img
+              src={photo.thumbnail_url || photo.public_url}
+              alt={`Ảnh hồ sơ ${index + 1}`}
+              width={480}
+              height={600}
+              loading="lazy"
+              decoding="async"
+              sizes="(max-width: 700px) 50vw, 200px"
+            />
             <div className="photo-item-label">
               <GripVertical size={15} />
               {photo.is_primary ? "Ảnh đại diện" : `Ảnh ${index + 1}`}
@@ -72,6 +80,7 @@ export function PhotoManager({
               <button
                 type="button"
                 title="Chuyển sang trái"
+                aria-label="Chuyển sang trái"
                 disabled={index === 0}
                 onClick={() => move(photo.id, -1)}
               >
@@ -80,6 +89,7 @@ export function PhotoManager({
               <button
                 type="button"
                 title="Chuyển sang phải"
+                aria-label="Chuyển sang phải"
                 disabled={index === photos.length - 1}
                 onClick={() => move(photo.id, 1)}
               >

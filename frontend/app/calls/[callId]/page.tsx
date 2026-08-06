@@ -265,7 +265,10 @@ export default function CallPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let inflight = false;
     async function refresh() {
+      if (inflight || cancelled) return;
+      inflight = true;
       try {
         const currentCall = await api<CallSession>(`/calls/${callId}`);
         if (cancelled) return;
@@ -292,15 +295,18 @@ export default function CallPage() {
         }
       } catch (caught: any) {
         if (!cancelled) setError(safeErrorMessage());
+      } finally {
+        inflight = false;
       }
     }
     void refresh();
-    const timer = setInterval(refresh, 1500);
+    const intervalMs = token && call?.status === "active" ? 10_000 : 1500;
+    const timer = setInterval(refresh, intervalMs);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [callId, token, router]);
+  }, [callId, token, call?.status, router]);
 
   async function end() {
     try {
