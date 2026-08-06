@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { AuthFormShell } from "@/components/auth-form-shell";
 import { Alert, Button, Field, Input } from "@/components/ui";
 
-export default function Login() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -82,5 +82,13 @@ export default function Login() {
         </Button>
       </form>
     </AuthFormShell>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<AuthFormShell title="Đăng nhập" subtitle="Chào mừng quay lại."><p>Vui lòng đợi…</p></AuthFormShell>}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -1,0 +1,8 @@
+Total messages: 9 (Errors: 5, Warnings: 0)
+Returning 5 messages for level "error"
+
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8400/live.js?token=ac41d10d-0f67-4ae0-adfa-6685479c7cd3:0
+[ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/profiles/me:0
+[ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/v1/profiles/me:0
+[ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://localhost:8000/api/v1/auth/me:0
+[ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://localhost:8000/api/v1/auth/me:0

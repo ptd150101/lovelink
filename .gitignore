@@ -24,3 +24,4 @@ htmlcov/
 /backend/celerybeat-schedule*
 .claude
 .impeccable
+.playwright-mcp

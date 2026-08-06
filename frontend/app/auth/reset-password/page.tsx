@@ -1,2 +1,72 @@
-"use client";import {useSearchParams} from "next/navigation";import {useState} from "react";import {api} from "@/lib/api";import {AuthFormShell} from "@/components/auth-form-shell";import {Alert,Button,Field,Input,Status} from "@/components/ui";
-export default function Reset(){const token=useSearchParams().get("token")||"";const [password,setPassword]=useState("");const [password_confirm,setConfirm]=useState("");const [msg,setMsg]=useState("");const [err,setErr]=useState("");async function submit(e:React.FormEvent){e.preventDefault();try{const r=await api<{detail:string}>("/auth/password/reset",{method:"POST",body:JSON.stringify({token,password,password_confirm})});setMsg(r.detail);setErr("")}catch(e:any){setErr(e.message)}}return <AuthFormShell title="Đặt lại mật khẩu" subtitle="Tạo mật khẩu mới cho tài khoản của bạn."><form onSubmit={submit} className="form-stack"><Field label="Mật khẩu mới"><Input type="password" minLength={10} required value={password} onChange={e=>setPassword(e.target.value)}/></Field><Field label="Nhập lại"><Input type="password" required value={password_confirm} onChange={e=>setConfirm(e.target.value)}/></Field>{err&&<Alert>{err}</Alert>}{msg&&<Status className="alert success-box">{msg}</Status>}<Button>Đặt lại mật khẩu</Button></form></AuthFormShell>}
+"use client";
+import { useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
+import { api } from "@/lib/api";
+import { AuthFormShell } from "@/components/auth-form-shell";
+import { Alert, Button, Field, Input, Status } from "@/components/ui";
+
+function ResetForm() {
+  const token = useSearchParams().get("token") || "";
+  const [password, setPassword] = useState("");
+  const [password_confirm, setConfirm] = useState("");
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const r = await api<{ detail: string }>("/auth/password/reset", {
+        method: "POST",
+        body: JSON.stringify({ token, password, password_confirm }),
+      });
+      setMsg(r.detail);
+      setErr("");
+    } catch (e: any) {
+      setErr(e.message);
+    }
+  }
+
+  return (
+    <AuthFormShell
+      title="Đặt lại mật khẩu"
+      subtitle="Tạo mật khẩu mới cho tài khoản của bạn."
+    >
+      <form onSubmit={submit} className="form-stack">
+        <Field label="Mật khẩu mới">
+          <Input
+            type="password"
+            minLength={10}
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
+        <Field label="Nhập lại">
+          <Input
+            type="password"
+            required
+            value={password_confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+        </Field>
+        {err && <Alert>{err}</Alert>}
+        {msg && <Status className="alert success-box">{msg}</Status>}
+        <Button>Đặt lại mật khẩu</Button>
+      </form>
+    </AuthFormShell>
+  );
+}
+
+export default function Reset() {
+  return (
+    <Suspense
+      fallback={
+        <AuthFormShell title="Đặt lại mật khẩu" subtitle="Đang tải…">
+          <p>Vui lòng đợi…</p>
+        </AuthFormShell>
+      }
+    >
+      <ResetForm />
+    </Suspense>
+  );
+}

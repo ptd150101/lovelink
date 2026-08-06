@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CheckCircle2, HeartHandshake, LockKeyhole, MessageCircle, Search, ShieldCheck, Video } from "lucide-react";
+import { Suspense } from "react";
 
 const principles = [
   [Search, "Khám phá có tiêu chí", "Chọn điều quan trọng với bạn trước khi bắt đầu làm quen."],

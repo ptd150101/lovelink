@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { api } from "@/lib/api";
 import { AuthFormShell } from "@/components/auth-form-shell";
 import { Button, Field, Input } from "@/components/ui";
 
-export default function VerifyEmail() {
+function VerifyEmailForm() {
   const token = useSearchParams().get("token") || "";
   const [message, setMessage] = useState(
     token ? "Đang xác minh…" : "Nhập email để nhận lại liên kết xác minh.",
@@ -61,5 +61,13 @@ export default function VerifyEmail() {
         </Link>
       </form>
     </AuthFormShell>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<AuthFormShell title="Xác minh email" subtitle="Đang tải…"><p>Vui lòng đợi…</p></AuthFormShell>}>
+      <VerifyEmailForm />
+    </Suspense>
   );
 }
