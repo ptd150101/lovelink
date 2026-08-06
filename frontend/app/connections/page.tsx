@@ -1,165 +1,24 @@
 "use client";
-
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Connection } from "@/lib/types";
-import { Button, Card, Empty } from "@/components/ui";
+import { Alert, Button, Card, Empty, Status } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
-import { formatDate } from "@/lib/utils";
+import { connectionStatusLabel, formatDate, safeErrorMessage } from "@/lib/utils";
 
 type Tab = "received" | "sent" | "accepted";
-
 export default function Connections() {
   const [tab, setTab] = useState<Tab>("received");
   const [items, setItems] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState("");
   const [disconnecting, setDisconnecting] = useState<Connection | null>(null);
-
-  const load = useCallback(async (nextTab: Tab) => {
-    setLoading(true);
-    try {
-      const response = await api<any>(`/connections/${nextTab}`);
-      setItems(response.results || response);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load(tab);
-  }, [load, tab]);
-
-  async function action(id: string, name: string) {
-    await api(`/connections/${id}/${name}`, { method: "POST" });
-    await load(tab);
-  }
-
-  async function disconnect(connection: Connection) {
-    await api(`/connections/${connection.id}`, { method: "DELETE" });
-    setDisconnecting(null);
-    await load(tab);
-  }
-
-  return (
-    <div className="page">
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">Kết nối</span>
-          <h1>Lời làm quen</h1>
-        </div>
-      </div>
-      <div className="tabs">
-        {[
-          ["received", "Đã nhận"],
-          ["sent", "Đã gửi"],
-          ["accepted", "Đã kết nối"],
-        ].map(([value, label]) => (
-          <button
-            key={value}
-            className={tab === value ? "active" : ""}
-            onClick={() => setTab(value as Tab)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {loading ? (
-        <p>Đang tải…</p>
-      ) : items.length ? (
-        <div className="stack-list">
-          {items.map((connection) => {
-            const other = connection.other_user;
-            const photo = other.primary_photo?.public_url;
-            return (
-              <Card key={connection.id} className="connection-card">
-                <div className="mini-avatar">
-                  {photo ? <img src={photo} alt="" /> : other.display_name[0]}
-                </div>
-                <div className="grow">
-                  <h3>
-                    <Link href={`/profiles/${other.public_id}`}>
-                      {other.display_name}
-                    </Link>
-                  </h3>
-                  <p>{connection.intro_message}</p>
-                  <small>
-                    {formatDate(connection.sent_at)} · {connection.status}
-                  </small>
-                </div>
-                <div className="connection-actions">
-                  {tab === "received" && connection.status === "pending" && (
-                    <>
-                      <Button
-                        variant="secondary"
-                        onClick={() => action(connection.id, "decline")}
-                      >
-                        Từ chối
-                      </Button>
-                      <Button onClick={() => action(connection.id, "accept")}>
-                        Chấp nhận
-                      </Button>
-                    </>
-                  )}
-                  {tab === "sent" && connection.status === "pending" && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => action(connection.id, "cancel")}
-                    >
-                      Hủy yêu cầu
-                    </Button>
-                  )}
-                  {tab === "accepted" && (
-                    <>
-                      <Link className="btn btn-primary" href="/messages">
-                        Nhắn tin
-                      </Link>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setDisconnecting(connection)}
-                      >
-                        Hủy kết nối
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <Empty
-          title="Chưa có dữ liệu"
-          body={
-            tab === "received"
-              ? "Các lời làm quen gửi tới bạn sẽ xuất hiện ở đây."
-              : tab === "sent"
-                ? "Bạn chưa gửi lời làm quen nào."
-                : "Kết nối được chấp nhận sẽ xuất hiện ở đây."
-          }
-        />
-      )}
-      {disconnecting && (
-        <Dialog
-          title={`Hủy kết nối với ${disconnecting.other_user.display_name}?`}
-          onClose={() => setDisconnecting(null)}
-        >
-          <p>
-            Hai bên sẽ không thể nhắn tin hoặc gọi video cho đến khi kết nối lại.
-          </p>
-          <div className="form-actions">
-            <Button variant="secondary" onClick={() => setDisconnecting(null)}>
-              Giữ kết nối
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => void disconnect(disconnecting)}
-            >
-              Hủy kết nối
-            </Button>
-          </div>
-        </Dialog>
-      )}
-    </div>
-  );
+  const load = useCallback(async (nextTab: Tab) => { setLoading(true); setError(false); try { const response = await api<any>(`/connections/${nextTab}`); setItems(response.results || response); } catch { setError(true); } finally { setLoading(false); } }, []);
+  useEffect(() => { void load(tab); }, [load, tab]);
+  async function action(id: string, name: string) { const key = `${id}:${name}`; if (busy) return; setBusy(key); setFeedback(""); try { await api(`/connections/${id}/${name}`, { method: "POST" }); setFeedback(name === "accept" ? "Đã chấp nhận lời làm quen." : name === "decline" ? "Đã từ chối lời làm quen." : "Đã hủy lời làm quen."); await load(tab); } catch { setFeedback(safeErrorMessage()); } finally { setBusy(null); } }
+  async function disconnect(connection: Connection) { if (busy) return; setBusy(`${connection.id}:disconnect`); setFeedback(""); try { await api(`/connections/${connection.id}`, { method: "DELETE" }); setDisconnecting(null); setFeedback("Đã hủy kết nối."); await load(tab); } catch { setFeedback(safeErrorMessage()); } finally { setBusy(null); } }
+  return <div className="page"><div className="page-heading"><div><span className="eyebrow">Kết nối</span><h1>Lời làm quen</h1></div></div><div className="tabs">{[["received","Đã nhận"],["sent","Đã gửi"],["accepted","Đã kết nối"]].map(([value,label])=><button key={value} className={tab===value?"active":""} onClick={()=>setTab(value as Tab)}>{label}</button>)}</div>{feedback&&<Status className="success-text">{feedback}</Status>}{error?<Alert>Không thể tải danh sách kết nối. <Button variant="secondary" onClick={()=>void load(tab)}>Thử lại</Button></Alert>:loading?<p role="status">Đang tải kết nối…</p>:items.length?<div className="stack-list">{items.map(connection=>{const other=connection.other_user;const photo=other.primary_photo?.public_url;const actionName=tab==="received"?"accept":tab==="sent"?"cancel":"disconnect";const actionBusy=busy===`${connection.id}:${actionName}`;return <Card key={connection.id} className="connection-card"><div className="mini-avatar">{photo?<img src={photo} alt=""/>:other.display_name[0]}</div><div className="grow"><h3><Link href={`/profiles/${other.public_id}`}>{other.display_name}</Link></h3><p>{connection.intro_message}</p><small>{formatDate(connection.sent_at)} · {connectionStatusLabel(connection.status)}</small></div><div className="connection-actions">{tab==="received"&&connection.status==="pending"&&<><Button variant="secondary" disabled={!!busy} aria-busy={busy===`${connection.id}:decline`} onClick={()=>void action(connection.id,"decline")}>{busy===`${connection.id}:decline`?"Đang xử lý…":"Từ chối"}</Button><Button disabled={!!busy} aria-busy={actionBusy} onClick={()=>void action(connection.id,"accept")}>{actionBusy?"Đang xử lý…":"Chấp nhận"}</Button></>}{tab==="sent"&&connection.status==="pending"&&<Button variant="secondary" disabled={!!busy} aria-busy={actionBusy} onClick={()=>void action(connection.id,"cancel")}>{actionBusy?"Đang xử lý…":"Hủy yêu cầu"}</Button>}{tab==="accepted"&&<><Link className="btn btn-primary" href="/messages">Nhắn tin</Link><Button variant="secondary" disabled={!!busy} onClick={()=>setDisconnecting(connection)}>Hủy kết nối</Button></>}</div></Card>})}</div>:<Empty title="Chưa có dữ liệu" body={tab==="received"?"Các lời làm quen gửi tới bạn sẽ xuất hiện ở đây.":tab==="sent"?"Bạn chưa gửi lời làm quen nào.":"Kết nối được chấp nhận sẽ xuất hiện ở đây."} action={<Link className="btn btn-secondary" href="/discover">Khám phá hồ sơ</Link>}/>} {disconnecting&&<Dialog title={`Hủy kết nối với ${disconnecting.other_user.display_name}?`} onClose={()=>{if(!busy)setDisconnecting(null)}}><p>Hai bên sẽ không thể nhắn tin hoặc gọi video cho đến khi kết nối lại.</p>{feedback&&<Alert>{feedback}</Alert>}<div className="form-actions"><Button variant="secondary" disabled={!!busy} onClick={()=>setDisconnecting(null)}>Giữ kết nối</Button><Button variant="danger" disabled={!!busy} aria-busy={!!busy} onClick={()=>void disconnect(disconnecting)}>{busy?"Đang xử lý…":"Hủy kết nối"}</Button></div></Dialog>}</div>;
 }

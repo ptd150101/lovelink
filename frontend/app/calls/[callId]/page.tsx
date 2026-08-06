@@ -29,7 +29,8 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { CallSession } from "@/lib/types";
-import { Button, Toast } from "@/components/ui";
+import { Alert, Button, Toast } from "@/components/ui";
+import { safeErrorMessage } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
 
 function qualityLabel(quality: ConnectionQuality) {
@@ -290,7 +291,7 @@ export default function CallPage() {
           }
         }
       } catch (caught: any) {
-        if (!cancelled) setError(caught.message);
+        if (!cancelled) setError(safeErrorMessage());
       }
     }
     void refresh();

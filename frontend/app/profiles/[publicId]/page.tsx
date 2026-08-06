@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Profile } from "@/lib/types";
-import { label } from "@/lib/utils";
+import { connectionStatusLabel, label, safeErrorMessage } from "@/lib/utils";
 import {
   Badge,
   Button,
@@ -46,7 +46,7 @@ export default function ProfileDetail() {
   useEffect(() => {
     api<Profile>(`/profiles/${publicId}`)
       .then(setProfile)
-      .catch((caught: any) => setMessage(caught.message));
+      .catch(() => { setMessageTone("error"); setMessage(safeErrorMessage()); });
   }, [publicId]);
 
   async function connect() {
@@ -66,7 +66,7 @@ export default function ProfileDetail() {
       );
     } catch (caught: any) {
       setMessageTone("error");
-      setMessage(caught.message);
+      setMessage(safeErrorMessage());
     }
   }
 
@@ -91,7 +91,7 @@ export default function ProfileDetail() {
       setMessage("Đã gửi báo cáo tới đội ngũ kiểm duyệt.");
     } catch (caught: any) {
       setMessageTone("error");
-      setMessage(caught.message);
+      setMessage(safeErrorMessage());
     }
   }
 

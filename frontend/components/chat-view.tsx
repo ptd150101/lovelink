@@ -13,7 +13,7 @@ import type {
 import { useRealtime } from "./realtime-provider";
 import { Alert, Button, Status, Textarea } from "./ui";
 import { Dialog } from "./dialog";
-import { formatDate } from "@/lib/utils";
+import { formatDate, safeErrorMessage } from "@/lib/utils";
 
 function presenceLabel(presence?: Presence | null) {
   if (!presence) return "Kết nối riêng tư";
@@ -128,7 +128,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     } catch (caught: any) {
       setText(value);
       setFeedbackTone("error");
-      setFeedback(caught.message);
+      setFeedback(safeErrorMessage());
     }
   }
 
@@ -141,7 +141,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       router.push(`/calls/${result.id}`);
     } catch (caught: any) {
       setFeedbackTone("error");
-      setFeedback(caught.message);
+      setFeedback(safeErrorMessage());
     }
   }
 
@@ -173,7 +173,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       setFeedback("Đã gửi báo cáo tới đội ngũ kiểm duyệt.");
     } catch (caught: any) {
       setFeedbackTone("error");
-      setFeedback(caught.message);
+      setFeedback(safeErrorMessage());
     }
   }
 

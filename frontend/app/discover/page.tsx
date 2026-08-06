@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { Profile } from "@/lib/types";
 import { ProfileCard } from "@/components/profile-card";
-import { Badge, Button, Empty, Field, Input, Select } from "@/components/ui";
+import { Alert, Badge, Button, Empty, Field, Input, Select } from "@/components/ui";
+import { safeErrorMessage } from "@/lib/utils";
 import { Dialog } from "@/components/dialog";
 
 type Choice = [string, string];
@@ -100,6 +101,7 @@ export default function Discover() {
   const [items, setItems] = useState<Profile[]>([]);
   const [reference, setReference] = useState<Ref | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [next, setNext] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(defaults);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -119,7 +121,7 @@ export default function Discover() {
 
   const load = useCallback(
     async (current: Filters, append = false, url?: string) => {
-      setLoading(true);
+      setLoading(true); setError(false);
       try {
         const response = await api<any>(
           url
@@ -135,6 +137,8 @@ export default function Discover() {
         if (typeof window !== "undefined" && !append) {
           history.replaceState(null, "", `/discover?${query(current)}`);
         }
+      } catch {
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -381,7 +385,9 @@ export default function Discover() {
         <aside className="filter-panel">{filtersUi}</aside>
         <section>
           <div className="results-count" aria-live="polite">{loading ? "Đang tìm hồ sơ…" : `${items.length} hồ sơ`}</div>
-          {loading && !items.length ? (
+          {error ? (
+            <Alert>Không thể tải hồ sơ. <Button variant="secondary" onClick={() => void load(filters)}>Thử lại</Button></Alert>
+          ) : loading && !items.length ? (
             <div className="empty">Đang tải hồ sơ…</div>
           ) : items.length ? (
             <>
