@@ -56,7 +56,7 @@ const defaults: Filters = {
   income: [],
   goal: [],
   verified: false,
-  has_photo: true,
+  has_photo: false,
   active_within_days: "",
   sort: "recommended",
 };

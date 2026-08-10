@@ -15,6 +15,55 @@ type Props = {
   setField: (key: string, value: any) => void;
 };
 
+const OCCUPATION_PRESETS: [string, string][] = [
+  ["Lập trình viên", "Lập trình viên"],
+  ["Kỹ sư", "Kỹ sư"],
+  ["Kế toán", "Kế toán"],
+  ["Nhân viên kinh doanh", "Nhân viên kinh doanh"],
+  ["Marketing", "Marketing"],
+  ["Giáo viên", "Giáo viên"],
+  ["Bác sĩ", "Bác sĩ"],
+  ["Điều dưỡng", "Điều dưỡng"],
+  ["Nhân viên văn phòng", "Nhân viên văn phòng"],
+  ["Quản lý", "Quản lý"],
+  ["Thiết kế", "Thiết kế"],
+  ["Công nhân", "Công nhân"],
+  ["Tài xế", "Tài xế"],
+  ["Nông dân", "Nông dân"],
+  ["Chủ doanh nghiệp", "Chủ doanh nghiệp"],
+  ["Freelancer", "Freelancer"],
+  ["Khác", "Khác"],
+];
+
+const RELIGIONS: [string, string][] = [
+  ["Không tôn giáo", "Không tôn giáo"],
+  ["Phật giáo", "Phật giáo"],
+  ["Công giáo", "Công giáo"],
+  ["Tin Lành", "Tin Lành"],
+  ["Cao Đài", "Cao Đài"],
+  ["Hòa Hảo", "Hòa Hảo"],
+  ["Hồi giáo", "Hồi giáo"],
+  ["Khác", "Khác"],
+];
+
+// ponytail: preset = value (tiếng Việt). Đổi khi backend thêm choices.
+function presetOf(value: string | null | undefined, presets: [string, string][]) {
+  if (!value) return "";
+  return presets.some(([preset]) => preset === value) ? value : "Khác";
+}
+
+function isOther(value: string | null | undefined, presets: [string, string][]) {
+  return presetOf(value, presets) === "Khác";
+}
+
+function otherValue(value: string | null | undefined, presets: [string, string][]) {
+  return value && value !== "Khác" ? value : "";
+}
+
+const occupationPreset = (v: string | null | undefined) =>
+  presetOf(v, OCCUPATION_PRESETS);
+const religionPreset = (v: string | null | undefined) => presetOf(v, RELIGIONS);
+
 function options(values: [string, string][]) {
   return values.map(([value, label]) => (
     <option key={value} value={value}>
@@ -51,24 +100,22 @@ export function BasicProfileFields({ profile, referenceData, setField }: Props) 
       </Field>
       <Field label="Muốn tìm">
         <div className="checkbox-grid">
-          {referenceData.choices.genders.map(([value, label]) => (
-            <label className="check" key={value}>
-              <input
-                type="checkbox"
-                checked={(profile.interested_genders || []).includes(value)}
-                onChange={(event) => {
-                  const current = profile.interested_genders || [];
-                  setField(
-                    "interested_genders",
-                    event.target.checked
-                      ? [...current, value]
-                      : current.filter((item: string) => item !== value),
-                  );
-                }}
-              />
-              {label}
-            </label>
-          ))}
+          {([["male", "Nam"], ["female", "Nữ"]] as [string, string][]).map(
+            ([value, label]) => (
+              <label className="check" key={value}>
+                <input
+                  type="radio"
+                  name="interested_gender"
+                  checked={
+                    (profile.interested_genders || []).length === 1 &&
+                    profile.interested_genders![0] === value
+                  }
+                  onChange={() => setField("interested_genders", [value])}
+                />
+                {label}
+              </label>
+            ),
+          )}
         </div>
       </Field>
       <Field label="Tỉnh/thành hiện tại">
@@ -106,13 +153,6 @@ export function BasicProfileFields({ profile, referenceData, setField }: Props) 
           {options(referenceData.choices.goals)}
         </Select>
       </Field>
-    </Card>
-  );
-}
-
-export function DetailProfileFields({ profile, referenceData, setField }: Props) {
-  return (
-    <Card className="form-grid">
       <Field label="Chiều cao (cm)">
         <Input
           type="number"
@@ -127,6 +167,13 @@ export function DetailProfileFields({ profile, referenceData, setField }: Props)
           }
         />
       </Field>
+    </Card>
+  );
+}
+
+export function DetailProfileFields({ profile, referenceData, setField }: Props) {
+  return (
+    <Card className="form-grid">
       <Field label="Quê quán">
         <Select
           value={profile.hometown_province || ""}
@@ -158,14 +205,26 @@ export function DetailProfileFields({ profile, referenceData, setField }: Props)
         </Select>
       </Field>
       <Field label="Nghề nghiệp cụ thể">
-        <Input
-          maxLength={160}
-          value={profile.occupation_text || ""}
-          onChange={(event) =>
-            setField("occupation_text", event.target.value)
-          }
-        />
+        <Select
+          value={occupationPreset(profile.occupation_text)}
+          onChange={(event) => setField("occupation_text", event.target.value)}
+        >
+          <option value="">Chọn</option>
+          {options(OCCUPATION_PRESETS)}
+        </Select>
       </Field>
+      {isOther(profile.occupation_text, OCCUPATION_PRESETS) && (
+        <Field label="Nghề nghiệp cụ thể khác">
+          <Input
+            maxLength={160}
+            placeholder="Nhập nghề nghiệp"
+            value={otherValue(profile.occupation_text, OCCUPATION_PRESETS)}
+            onChange={(event) =>
+              setField("occupation_text", event.target.value || "Khác")
+            }
+          />
+        </Field>
+      )}
       <Field label="Học vấn">
         <Select
           value={profile.education_level || ""}
@@ -187,12 +246,26 @@ export function DetailProfileFields({ profile, referenceData, setField }: Props)
         </Select>
       </Field>
       <Field label="Tôn giáo">
-        <Input
-          maxLength={100}
-          value={profile.religion || ""}
+        <Select
+          value={religionPreset(profile.religion)}
           onChange={(event) => setField("religion", event.target.value)}
-        />
+        >
+          <option value="">Chọn</option>
+          {options(RELIGIONS)}
+        </Select>
       </Field>
+      {isOther(profile.religion, RELIGIONS) && (
+        <Field label="Tôn giáo khác">
+          <Input
+            maxLength={100}
+            placeholder="Nhập tôn giáo"
+            value={otherValue(profile.religion, RELIGIONS)}
+            onChange={(event) =>
+              setField("religion", event.target.value || "Khác")
+            }
+          />
+        </Field>
+      )}
       <Field label="Hút thuốc">
         <Select
           value={profile.smoking_status || ""}
