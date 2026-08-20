@@ -40,7 +40,7 @@ test("real backend supports realtime chat, receipts and a LiveKit call", async (
 
   // Reloading the callee proves the pending call is recovered through REST.
   await second.reload();
-  await expect(second.getByText("đang gọi video cho bạn")).toBeVisible({
+  await expect(second.getByText("An đang gọi bạn")).toBeVisible({
     timeout: 15_000,
   });
   await second.getByRole("button", { name: /Trả lời/ }).click();
