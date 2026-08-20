@@ -23,10 +23,10 @@ Generated accounts use emails such as `mock.000000001@lovelink.local` and the sh
 Add three interests and one external placeholder portrait per profile:
 
 ```powershell
-uv run --env-file ../.env.host python manage.py seed_mock_users \
-  --count 1000000 \
-  --batch-size 5000 \
-  --with-interests \
+uv run --env-file ../.env.host python manage.py seed_mock_users `
+  --count 1000000 `
+  --batch-size 5000 `
+  --with-interests `
   --with-photos
 ```
 
