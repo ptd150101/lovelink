@@ -89,12 +89,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   async function respond(accepted: boolean) {
     if (!incomingCall) return;
+    const callId = incomingCall.id;
     try {
-      const response = await api<any>(`/calls/${incomingCall.id}/respond`, {
+      await api(`/calls/${callId}/${accepted ? "accept" : "decline"}`, {
         method: "POST",
-        body: JSON.stringify({ accept: accepted }),
       });
-      if (accepted) router.push(`/calls/${response.id}`);
+      if (accepted) router.push(`/calls/${callId}`);
     } finally {
       clearIncoming();
     }
