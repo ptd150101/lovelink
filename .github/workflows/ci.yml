@@ -81,7 +81,7 @@ jobs:
       - working-directory: frontend
         env:
           CI: "1"
-        run: npm run test:e2e -- --project=chromium e2e/public.spec.ts
+        run: npm run test:e2e -- --project=chromium e2e/public.spec.ts e2e/profile-detail.spec.ts
 
   fullstack-e2e:
     runs-on: ubuntu-latest
