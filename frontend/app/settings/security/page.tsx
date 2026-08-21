@@ -6,7 +6,6 @@ import { SettingsNav } from "@/components/settings-nav";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
 import { Alert, Button, Card, Field, Input, Status } from "@/components/ui";
-import { formatDate } from "@/lib/utils";
 
 export default function Security() {
   const { user, refresh } = useAuth();
@@ -14,7 +13,6 @@ export default function Security() {
     current_password: "",
     new_password: "",
   });
-  const [sessions, setSessions] = useState<any[]>([]);
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordTone, setPasswordTone] = useState<"status" | "error">("status");
   const [phone, setPhone] = useState("");
@@ -23,14 +21,6 @@ export default function Security() {
   const [phoneMessage, setPhoneMessage] = useState("");
   const [phoneTone, setPhoneTone] = useState<"status" | "error">("status");
   const [phoneBusy, setPhoneBusy] = useState(false);
-
-  async function loadSessions() {
-    setSessions(await api("/auth/sessions"));
-  }
-
-  useEffect(() => {
-    void loadSessions();
-  }, []);
 
   useEffect(() => {
     if (user?.phone) setPhone(user.phone);
@@ -209,36 +199,6 @@ export default function Security() {
               <Status>{passwordMessage}</Status>
             ))}
         </form>
-      </Card>
-
-      <Card>
-        <h2>Phiên đăng nhập</h2>
-        <div className="session-list">
-          {sessions.map((session) => (
-            <div key={session.id}>
-              <div>
-                <b>{session.current ? "Thiết bị hiện tại" : "Thiết bị khác"}</b>
-                <p>{session.user_agent || "Không rõ thiết bị"}</p>
-                <small>
-                  {session.ip_address} · {formatDate(session.last_seen_at)}
-                </small>
-              </div>
-              {!session.current && (
-                <Button
-                  variant="secondary"
-                  onClick={async () => {
-                    await api(`/auth/sessions/${session.id}`, {
-                      method: "DELETE",
-                    });
-                    await loadSessions();
-                  }}
-                >
-                  Đăng xuất
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
       </Card>
     </div>
   );
