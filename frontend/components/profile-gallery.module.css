@@ -1,0 +1,134 @@
+.gallery {
+  min-width: 0;
+}
+
+.mainPhotoButton,
+.thumbnailButton {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  position: relative;
+  background: #dbeafe;
+  color: inherit;
+}
+
+.mainPhotoButton {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  display: block;
+}
+
+.mainPhotoButton:focus-visible,
+.thumbnailButton:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.mainPhoto,
+.thumbnailButton img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.viewHint {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.76);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.mainPhotoButton:hover .viewHint,
+.mainPhotoButton:focus-visible .viewHint {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.emptyPhoto,
+.imageFallback,
+.thumbnailFallback {
+  display: grid;
+  place-items: center;
+}
+
+.emptyPhoto {
+  gap: 10px;
+  color: var(--text-muted);
+  background: linear-gradient(135deg, #dbeafe, #fce7f3);
+}
+
+.emptyPhoto svg {
+  width: 72px;
+  height: 72px;
+}
+
+.imageFallback {
+  width: 100%;
+  height: 100%;
+  align-content: center;
+  gap: 9px;
+  color: var(--text-muted);
+  background: #eef2f7;
+}
+
+.imageFallback svg {
+  width: 42px;
+  height: 42px;
+}
+
+.thumbnails {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.thumbnailButton {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+}
+
+.thumbnailFallback {
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+  background: #eef2f7;
+}
+
+.moreOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.52);
+  color: #fff;
+  font-size: clamp(1rem, 2.2vw, 1.45rem);
+  font-weight: 800;
+}
+
+@media (max-width: 700px) {
+  .mainPhotoButton {
+    border-radius: 16px;
+  }
+
+  .thumbnails {
+    gap: 7px;
+  }
+
+  .viewHint {
+    opacity: 1;
+    transform: none;
+  }
+}
